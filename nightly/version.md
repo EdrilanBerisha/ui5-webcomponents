@@ -1,7 +1,5 @@
-commit 407836c2aac5a17070811dd37c8fd4eefe14984c
-Author: Siyana Todorova <72251110+s-todorova@users.noreply.github.com>
-Date:   Fri Mar 21 16:46:36 2025 +0200
+commit d3580adacf83d7fa636927f6e6c3b0d20df50d27
+Author: Dobromira Boycheva <dobromira.boycheva@sap.com>
+Date:   Mon Mar 24 22:44:24 2025 +0200
 
-    chore(ui5-radio-button): update dash style for read-only state in Fiori themes (#11137)
-    
-    JIRA: BGSOFUIRODOPI-3437
+    feat(ui5-user-menu): design enhancements (#11166)
