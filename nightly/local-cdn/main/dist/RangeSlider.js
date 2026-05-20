@@ -8,7 +8,9 @@ var RangeSlider_1;
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { isEscape, isEnter, isHome, isEnd, } from "@ui5/webcomponents-base/dist/Keys.js";
+import ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
+import { isEscape, isEnter, isHome, isEnd, isF2, } from "@ui5/webcomponents-base/dist/Keys.js";
+import { getAssociatedLabelForTexts } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 import SliderBase from "./SliderBase.js";
 import RangeSliderTemplate from "./RangeSliderTemplate.js";
 // Texts
@@ -70,6 +72,34 @@ import rangeSliderStyles from "./generated/themes/RangeSlider.css.js";
  * @csspart handle - Used to style the handles of the `ui5-range-slider`.
  */
 let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
+    /**
+     * Defines start point of a selection - position of a first handle on the slider.
+     * @default 0
+     * @formEvents change input
+     * @formProperty
+     * @public
+     */
+    set startValue(value) {
+        this._startValue = value;
+        this.tooltipStartValue = value?.toString() ?? "";
+    }
+    get startValue() {
+        return this._startValue;
+    }
+    /**
+     * Defines end point of a selection - position of a second handle on the slider.
+     * @default 100
+     * @formEvents change input
+     * @formProperty
+     * @public
+     */
+    set endValue(value) {
+        this._endValue = value;
+        this.tooltipEndValue = value?.toString() ?? "";
+    }
+    get endValue() {
+        return this._endValue;
+    }
     get formFormattedValue() {
         const formData = new FormData();
         if (!this.name) {
@@ -81,25 +111,16 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
     }
     constructor() {
         super();
-        /**
-         * Defines start point of a selection - position of a first handle on the slider.
-         * @default 0
-         * @formEvents change input
-         * @formProperty
-         * @public
-         */
-        this.startValue = 0;
-        /**
-         * Defines end point of a selection - position of a second handle on the slider.
-         * @default 100
-         * @formEvents change input
-         * @formProperty
-         * @public
-         */
-        this.endValue = 100;
+        this.tooltipStartValue = "";
+        this.tooltipEndValue = "";
+        this.tooltipStartValueState = "None";
+        this.tooltipEndValueState = "None";
         this.rangePressed = false;
+        this._progressFocused = false;
         this._isStartValueValid = false;
         this._isEndValueValid = false;
+        this._startValue = 0;
+        this._endValue = 100;
         this._isPressInCurrentRange = false;
         this._handeIsPressed = false;
         this._reversedValues = false;
@@ -108,16 +129,25 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         this._stateStorage.endValue = undefined;
         this._lastValidStartValue = this.min.toString();
         this._lastValidEndValue = this.max.toString();
+        this._onDocumentClickBound = this._onDocumentClick.bind(this);
     }
-    get tooltipStartValue() {
-        const ctor = this.constructor;
-        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this._effectiveStep);
-        return this.startValue.toFixed(stepPrecision);
+    onEnterDOM() {
+        document.addEventListener("mousedown", this._onDocumentClickBound, true);
     }
-    get tooltipEndValue() {
-        const ctor = this.constructor;
-        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this._effectiveStep);
-        return this.endValue.toFixed(stepPrecision);
+    onExitDOM() {
+        document.removeEventListener("mousedown", this._onDocumentClickBound, true);
+    }
+    /**
+     * Handles document-level clicks to clear progress focus when clicking outside.
+     * @private
+     */
+    _onDocumentClick(e) {
+        const clickedInside = e.composedPath().includes(this);
+        if (!clickedInside) {
+            if (this._tooltipsOpen) {
+                this._tooltipsOpen = false;
+            }
+        }
     }
     get _ariaDisabled() {
         return this.disabled || undefined;
@@ -159,9 +189,6 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
             this._setAffectedValue(affectedValue);
             this.update(affectedValue, this.startValue, this.endValue);
         }
-        if (this.editableTooltip) {
-            this._saveInputValues();
-        }
         if (!this.isCurrentStateOutdated()) {
             return;
         }
@@ -169,6 +196,12 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         this.syncUIAndState();
         this._updateHandlesAndRange(0);
         this.update(this._valueAffected, this.startValue, this.endValue);
+    }
+    onAfterRendering() {
+        super.onAfterRendering();
+        [...this.getDomRef().querySelectorAll("[ui5-slider-tooltip]")].forEach(tooltip => {
+            tooltip.repositionTooltip();
+        });
     }
     syncUIAndState() {
         // Validate step and update the stored state for the step property.
@@ -207,9 +240,7 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
             this._startValueInitial = this.startValue;
             this._endValueInitial = this.endValue;
         }
-        if (this.showTooltip) {
-            this._tooltipVisibility = SliderBase.TOOLTIP_VISIBILITY.VISIBLE;
-        }
+        this._tooltipsOpen = this.showTooltip;
     }
     /**
      * Handles focus out event of the focusable components inner elements.
@@ -230,35 +261,9 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         this._setAffectedValue(undefined);
         this._startValueInitial = undefined;
         this._endValueInitial = undefined;
-        if (this.showTooltip && !e.relatedTarget?.hasAttribute("ui5-input")) {
-            this._tooltipVisibility = SliderBase.TOOLTIP_VISIBILITY.HIDDEN;
-        }
-    }
-    _onInputFocusOut(e) {
-        const tooltipInput = e.target;
-        const oppositeTooltipInput = tooltipInput.hasAttribute("data-sap-ui-start-value") ? this.shadowRoot.querySelector("[ui5-input][data-sap-ui-end-value]") : this.shadowRoot.querySelector("[ui5-input][data-sap-ui-start-value]");
-        const relatedTarget = e.relatedTarget;
-        if (this.startValue > this.endValue) {
-            this._areInputValuesSwapped = true;
-            oppositeTooltipInput.focus();
-            return;
-        }
-        if (tooltipInput.hasAttribute("data-sap-ui-start-value")) {
-            this._setAffectedValue("startValue");
-        }
-        else {
-            this._setAffectedValue("endValue");
-        }
-        if (!this._areInputValuesSwapped || !this.shadowRoot.contains(relatedTarget)) {
-            this._tooltipVisibility = SliderBase.TOOLTIP_VISIBILITY.HIDDEN;
-        }
-        this._updateValueFromInput(e);
-        this._updateInputValue();
-        this.update(this._valueAffected, parseFloat(this._lastValidStartValue), parseFloat(this._lastValidEndValue));
-        const isTooltipInputValueValid = parseFloat(tooltipInput.value) >= this.min && parseFloat(tooltipInput.value) <= this.max;
-        if (!isTooltipInputValueValid) {
-            tooltipInput.value = tooltipInput.hasAttribute("data-sap-ui-start-value") ? this._lastValidStartValue : this._lastValidEndValue;
-            tooltipInput.valueState = "None";
+        this._progressFocused = false;
+        if (this.showTooltip && !e.relatedTarget?.hasAttribute("ui5-slider-tooltip")) {
+            this._tooltipsOpen = false;
         }
     }
     /**
@@ -282,7 +287,9 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         this._startValueAtBeginningOfAction = this.startValue;
         this._endValueAtBeginningOfAction = this.endValue;
         if (isEscape(e)) {
-            this.update(undefined, this._startValueInitial, this._endValueInitial);
+            if (this._startValueInitial !== undefined && this._endValueInitial !== undefined) {
+                this.update(undefined, this._startValueInitial, this._endValueInitial);
+            }
             return;
         }
         // Set the target of the interaction based on the focused inner element
@@ -305,16 +312,19 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         }
         // Update a single value if one of the handles is focused or the range if not already at min or max
         const ctor = this.constructor;
+        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this._effectiveStep);
         if (affectedValue && !this._isPressInCurrentRange) {
             const propValue = this[affectedValue];
-            const newValue = ctor.clipValue(newValueOffset + propValue, min, max);
+            const newValue = Number(ctor.clipValue(newValueOffset + propValue, min, max).toFixed(stepPrecision));
             this.update(affectedValue, newValue, undefined);
         }
         else if ((newValueOffset < 0 && this.startValue > min) || (newValueOffset > 0 && this.endValue < max)) {
-            const newStartValue = ctor.clipValue(newValueOffset + this.startValue, min, max);
-            const newEndValue = ctor.clipValue(newValueOffset + this.endValue, min, max);
+            const newStartValue = Number(ctor.clipValue(newValueOffset + this.startValue, min, max).toFixed(stepPrecision));
+            const newEndValue = Number(ctor.clipValue(newValueOffset + this.endValue, min, max).toFixed(stepPrecision));
             this.update(affectedValue, newStartValue, newEndValue);
         }
+        this.tooltipStartValue = this.startValue.toString();
+        this.tooltipEndValue = this.endValue.toString();
     }
     /**
      * Determines affected value (start/end) depending on the currently
@@ -328,7 +338,9 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         if (this.shadowRoot.activeElement === this._endHandle) {
             this._setAffectedValue("endValue");
         }
-        if (this.shadowRoot.activeElement === this._progressBar) {
+        // Progress bar is inside SliderScale's shadow DOM, so check the nested activeElement
+        const sliderScale = this.shadowRoot.querySelector("[ui5-slider-scale]");
+        if (sliderScale?.shadowRoot?.activeElement === this._progressBar) {
             this._setAffectedValue(undefined);
         }
         this._setIsPressInCurrentRange(!this._valueAffected);
@@ -341,8 +353,9 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
     _homeEndForSelectedRange(e, affectedValue, min, max) {
         const newValueOffset = this._handleActionKeyPressBase(e, affectedValue);
         const ctor = this.constructor;
-        const newStartValue = ctor.clipValue(newValueOffset + this.startValue, min, max);
-        const newEndValue = ctor.clipValue(newValueOffset + this.endValue, min, max);
+        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this._effectiveStep);
+        const newStartValue = Number(ctor.clipValue(newValueOffset + this.startValue, min, max).toFixed(stepPrecision));
+        const newEndValue = Number(ctor.clipValue(newValueOffset + this.endValue, min, max).toFixed(stepPrecision));
         this.update(undefined, newStartValue, newEndValue);
     }
     /**
@@ -382,15 +395,30 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         }
         // If step is 0 no interaction is available because there is no constant
         // (equal for all user environments) quantitative representation of the value
-        if (this.disabled || this._effectiveStep === 0 || e.target.hasAttribute("ui5-input")) {
+        if (this.disabled || this._effectiveStep === 0 || e.target.hasAttribute("ui5-slider-tooltip")) {
             return;
         }
-        // Calculate the new value from the press position of the event
+        // Pre-calculate whether the press is in the current range before handleDownBase
+        // This is needed so focusInnerElement() knows where to focus
+        const ctor = this.constructor;
+        const pageX = ctor.getPageXValueFromEvent(e);
+        const tempValue = ctor.getValueFromInteraction(e, this._effectiveStep, this._effectiveMin, this._effectiveMax, this.getBoundingClientRect(), this.directionStart);
+        const isInRange = tempValue >= this.startValue && tempValue <= this.endValue;
+        const startHandle = this._startHandle;
+        const endHandle = this._endHandle;
+        const inStartHandle = startHandle && pageX >= startHandle.getBoundingClientRect().left && pageX <= startHandle.getBoundingClientRect().right;
+        const inEndHandle = endHandle && pageX >= endHandle.getBoundingClientRect().left && pageX <= endHandle.getBoundingClientRect().right;
         const newValue = this.handleDownBase(e);
-        // Determine the rest of the needed details from the start of the interaction.
+        if (isInRange && !inStartHandle && !inEndHandle) {
+            this._setIsPressInCurrentRange(true);
+            this._progressFocused = true;
+            this.rangePressed = true;
+        }
+        else {
+            this._progressFocused = false;
+            this.rangePressed = false;
+        }
         this._saveInteractionStartData(e, newValue);
-        this.rangePressed = this._isPressInCurrentRange;
-        // Do not yet update the RangeSlider if press is in range or over a handle.
         if (this._isPressInCurrentRange || this._handeIsPressed) {
             this._handeIsPressed = false;
             return;
@@ -408,7 +436,7 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
      * @private
      */
     _saveInteractionStartData(e, newValue) {
-        const progressBarDom = this.shadowRoot.querySelector(".ui5-slider-progress").getBoundingClientRect();
+        const progressBarDom = this._progressBar?.getBoundingClientRect();
         // Save the state of the value properties on the start of the interaction
         this._startValueAtBeginningOfAction = this.startValue;
         this._endValueAtBeginningOfAction = this.endValue;
@@ -418,7 +446,9 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         // Which element of the Range Slider is pressed and which value property to be modified on further interaction
         this._pressTargetAndAffectedValue(this._initialPageXPosition, newValue);
         // Use the progress bar to save the initial coordinates of the start-handle when the interaction begins.
-        this._initialStartHandlePageX = this.directionStart === "left" ? progressBarDom.left : progressBarDom.right;
+        if (progressBarDom) {
+            this._initialStartHandlePageX = this.directionStart === "left" ? progressBarDom.left : progressBarDom.right;
+        }
     }
     /**
      * Called when the user moves the slider
@@ -427,7 +457,7 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
     _handleMove(e) {
         e.preventDefault();
         // If 'step' is 0 no interaction is available as there is no constant quantitative representation of the value
-        if (this.disabled || this._effectiveStep === 0 || e.target.hasAttribute("ui5-input")) {
+        if (this.disabled || this._effectiveStep === 0) {
             return;
         }
         // Update UI and state when dragging a single Range Slider handle
@@ -437,6 +467,8 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         }
         // Updates UI and state when dragging of the whole selected range
         this._updateValueOnRangeDrag(e);
+        this.tooltipStartValue = this.startValue.toString();
+        this.tooltipEndValue = this.endValue.toString();
     }
     /**
      * Updates UI and state when dragging a single Range Slider handle
@@ -461,10 +493,7 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         // Update the UI and the state according to the calculated new values
         this.update(undefined, newValues[0], newValues[1]);
     }
-    _handleUp(e) {
-        if (e.target.hasAttribute("ui5-input")) {
-            return;
-        }
+    _handleUp() {
         this._setAffectedValueByFocusedElement();
         this._setAffectedValue(undefined);
         if (this.startValue !== this._startValueAtBeginningOfAction || this.endValue !== this._endValueAtBeginningOfAction) {
@@ -475,25 +504,6 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         this.rangePressed = false;
         this._startValueAtBeginningOfAction = undefined;
         this._endValueAtBeginningOfAction = undefined;
-    }
-    _updateValueFromInput(e) {
-        if (this._areInputValuesSwapped) {
-            return;
-        }
-        const input = e.target;
-        const inputValue = parseFloat(input.value);
-        const isValueValid = inputValue >= this._effectiveMin && inputValue <= this._effectiveMax;
-        if (!isValueValid) {
-            return;
-        }
-        if (input.hasAttribute("data-sap-ui-start-value")) {
-            this.startValue = inputValue;
-            return;
-        }
-        this.endValue = inputValue;
-        if (this.startValue > this.endValue) {
-            this._areInputValuesSwapped = true;
-        }
     }
     /**
      * Determines where the press occured and which values of the Range Slider
@@ -509,8 +519,8 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
      * @private
      */
     _pressTargetAndAffectedValue(clientX, value) {
-        const startHandle = this.shadowRoot.querySelector(".ui5-slider-handle--start");
-        const endHandle = this.shadowRoot.querySelector(".ui5-slider-handle--end");
+        const startHandle = this._startHandle;
+        const endHandle = this._endHandle;
         // Check if the press point is in the bounds of any of the Range Slider handles
         const handleStartDomRect = startHandle.getBoundingClientRect();
         const handleEndDomRect = endHandle.getBoundingClientRect();
@@ -580,19 +590,18 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
      * @protected
      */
     focusInnerElement() {
-        if (this.editableTooltip && this._tooltipVisibility === SliderBase.TOOLTIP_VISIBILITY.HIDDEN) {
-            return;
-        }
         const isReversed = this._areValuesReversed();
         const affectedValue = this._valueAffected;
         if (this._isPressInCurrentRange || !affectedValue) {
-            this._progressBar.focus();
+            this._progressBar?.focus();
         }
         if ((affectedValue === "startValue" && !isReversed) || (affectedValue === "endValue" && isReversed)) {
-            this._startHandle.focus();
+            this._startHandle?.focus();
+            this.bringToFrontTooltip("start");
         }
         if ((affectedValue === "endValue" && !isReversed) || (affectedValue === "startValue" && isReversed)) {
-            this._endHandle.focus();
+            this._endHandle?.focus();
+            this.bringToFrontTooltip("end");
         }
     }
     /**
@@ -619,7 +628,10 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         // And the opposite - if the start handle reaches the beginning of the slider keep the initially selected range.
         const ctor = this.constructor;
         startValue = ctor.clipValue(startValue, min, max - selectedRange);
-        return [startValue, startValue + selectedRange];
+        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this._effectiveStep);
+        const endValue = Number((startValue + selectedRange).toFixed(stepPrecision));
+        startValue = Number(startValue.toFixed(stepPrecision));
+        return [startValue, endValue];
     }
     /**
      * Computes the new value based on the difference of the current cursor location from the
@@ -685,76 +697,113 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
             this._secondHandlePositionFromStart = ((this.endValue - min) / (max - min)) * 100;
         }
     }
-    _onInputKeydown(e) {
-        const targetedInput = e.target;
-        const startValueInput = this.shadowRoot.querySelector("[ui5-input][data-sap-ui-start-value]");
-        const endValueInput = this.shadowRoot.querySelector("[ui5-input][data-sap-ui-end-value]");
-        const startValue = parseFloat(startValueInput.value);
-        const endValue = parseFloat(endValueInput.value);
-        const affectedValue = targetedInput.hasAttribute("data-sap-ui-start-value") ? "startValue" : "endValue";
-        super._onInputKeydown(e);
-        if (isEnter(e) && startValue > endValue) {
-            const swappedInput = affectedValue === "startValue" ? endValueInput : startValueInput;
-            const isValueValid = parseFloat(targetedInput.value) >= this.min && parseFloat(startValueInput.value) <= this.max;
-            if (!isValueValid) {
-                targetedInput.valueState = "Negative";
-                return;
+    bringToFrontTooltip(handle) {
+        const tooltipSelector = handle === "start"
+            ? "[data-sap-ui-start-value]"
+            : "[data-sap-ui-end-value]";
+        const tooltip = this.shadowRoot.querySelector(tooltipSelector);
+        if (tooltip?.hidePopover && tooltip?.showPopover) {
+            const frame = requestAnimationFrame(() => {
+                if (tooltip.getDomRef()?.offsetParent === null) {
+                    cancelAnimationFrame(frame);
+                    return;
+                }
+                tooltip.hidePopover();
+                tooltip.showPopover();
+            });
+        }
+    }
+    _onTooltopForwardFocus(e) {
+        const tooltip = e.target;
+        tooltip.followRef?.focus();
+    }
+    _onTooltipChange(e) {
+        // Skip if this is a focusout change event triggered by the swap focus change
+        if (this._areInputValuesSwapped) {
+            this._areInputValuesSwapped = false;
+            return;
+        }
+        const tooltip = e.target;
+        const isStart = tooltip.hasAttribute("data-sap-ui-start-value");
+        const inputValue = parseFloat(e.detail.value);
+        const isInvalid = inputValue > this._effectiveMax || inputValue < this._effectiveMin;
+        if (isInvalid) {
+            if (isStart) {
+                this.tooltipStartValueState = ValueState.Negative;
+                this.tooltipStartValue = e.detail.value;
             }
-            this._isEndValueValid = parseFloat(endValueInput.value) >= this.min && parseFloat(endValueInput.value) <= this.max;
+            else {
+                this.tooltipEndValueState = ValueState.Negative;
+                this.tooltipEndValue = e.detail.value;
+            }
+            return;
+        }
+        const clampedValue = Math.min(this.max, Math.max(this.min, inputValue));
+        if (isStart) {
+            this.tooltipStartValueState = ValueState.None;
+            this.startValue = clampedValue;
+            this._lastValidStartValue = clampedValue.toString();
+        }
+        else {
+            this.tooltipEndValueState = ValueState.None;
+            this.endValue = clampedValue;
+            this._lastValidEndValue = clampedValue.toString();
+        }
+        if (this.startValue > this.endValue) {
             this._areInputValuesSwapped = true;
-            this._setAffectedValue(affectedValue === "startValue" ? "endValue" : "startValue");
-            startValueInput.value = this._getFormattedValue(this.endValue.toString());
-            endValueInput.value = this._getFormattedValue(this.startValue.toString());
-            swappedInput.focus();
-            return;
+            const temp = this.startValue;
+            this.startValue = this.endValue;
+            this.endValue = temp;
+            const tempValid = this._lastValidStartValue;
+            this._lastValidStartValue = this._lastValidEndValue;
+            this._lastValidEndValue = tempValid;
+            const oppositeSelector = isStart
+                ? "[data-sap-ui-end-value]"
+                : "[data-sap-ui-start-value]";
+            const oppositeInput = this.shadowRoot.querySelector(oppositeSelector);
+            oppositeInput?.focus();
         }
-        this._setAffectedValue(affectedValue);
+        this.bringToFrontTooltip(isStart ? "start" : "end");
+        this.update("value", this.startValue, this.endValue);
+        this.fireDecoratorEvent("change");
     }
-    _updateInputValue() {
-        const startValueInput = this.shadowRoot.querySelector("[ui5-input][data-sap-ui-start-value]");
-        const endValueInput = this.shadowRoot.querySelector("[ui5-input][data-sap-ui-end-value]");
-        if (!startValueInput && !endValueInput) {
-            return;
+    _onTooltipFocusChange(e) {
+        const tooltip = e.target;
+        const isStart = tooltip.hasAttribute("data-sap-ui-start-value");
+        const value = isStart ? this.tooltipStartValue : this.tooltipEndValue;
+        const isInvalid = parseFloat(value) > this._effectiveMax || parseFloat(value) < this._effectiveMin;
+        if (isInvalid) {
+            if (isStart) {
+                this.tooltipStartValueState = ValueState.None;
+                this.tooltipStartValue = this.startValue.toString();
+            }
+            else {
+                this.tooltipEndValueState = ValueState.None;
+                this.tooltipEndValue = this.endValue.toString();
+            }
         }
-        this._isStartValueValid = parseFloat(startValueInput.value) >= this.min && parseFloat(startValueInput.value) <= this.max;
-        this._isEndValueValid = parseFloat(endValueInput.value) >= this.min && parseFloat(endValueInput.value) <= this.max;
-        if (!this._isStartValueValid) {
-            startValueInput.valueState = "Negative";
-            return;
-        }
-        if (!this._isEndValueValid) {
-            endValueInput.valueState = "Negative";
-            return;
-        }
-        this._lastValidStartValue = startValueInput.value;
-        this._lastValidEndValue = endValueInput.value;
-        startValueInput.valueState = "None";
-        endValueInput.valueState = "None";
     }
-    _saveInputValues() {
-        const startValueInput = this.shadowRoot.querySelector("[ui5-input][data-sap-ui-start-value]");
-        const endValueInput = this.shadowRoot.querySelector("[ui5-input][data-sap-ui-end-value]");
-        if (this.editableTooltip && startValueInput && endValueInput) {
-            const inputStartValue = parseFloat(startValueInput.value);
-            const inputEndValue = parseFloat(endValueInput.value);
-            const isStartValueValid = inputStartValue >= this.min && inputStartValue <= this.max;
-            const isEndValueValid = inputEndValue >= this.min && inputEndValue <= this.max;
-            if (this._isUserInteraction) {
-                startValueInput.value = isStartValueValid ? this._getFormattedValue(this.startValue.toString()) : this._getFormattedValue(this._lastValidStartValue);
-                endValueInput.value = isEndValueValid ? this._getFormattedValue(this.endValue.toString()) : this._getFormattedValue(this._lastValidEndValue);
-                this.startValue = parseFloat(this._getFormattedValue(this.startValue.toString()));
-                this.endValue = parseFloat(this._getFormattedValue(this.endValue.toString()));
-                this.syncUIAndState();
-                this._updateHandlesAndRange(0);
-                this.update(this._valueAffected, this.startValue, this.endValue);
-                return;
-            }
-            this._lastValidStartValue = isStartValueValid ? this._getFormattedValue(inputStartValue.toString()) : this._getFormattedValue(this._lastValidStartValue);
-            this._lastValidEndValue = isEndValueValid ? this._getFormattedValue(inputEndValue.toString()) : this._getFormattedValue(this._lastValidEndValue);
-            if (startValueInput.valueState !== "Negative" && endValueInput.valueState !== "Negative") {
-                startValueInput.value = isStartValueValid ? this._getFormattedValue(inputStartValue.toString()) : this._getFormattedValue(this._lastValidStartValue);
-                endValueInput.value = isEndValueValid ? this._getFormattedValue(inputEndValue.toString()) : this._getFormattedValue(this._lastValidEndValue);
-            }
+    _onTooltipOpen() {
+        if (!this.startValue || !this.endValue) {
+            return;
+        }
+        this.tooltipStartValue = this.startValue.toString();
+        this.tooltipEndValue = this.endValue.toString();
+    }
+    _onTooltipInput(e) {
+        const tooltip = e.target;
+        const isStart = tooltip.hasAttribute("data-sap-ui-start-value");
+        if (isStart) {
+            this.tooltipStartValue = e.detail.value;
+        }
+        else {
+            this.tooltipEndValue = e.detail.value;
+        }
+    }
+    _onTooltipKeydown(e) {
+        if (isF2(e)) {
+            e.preventDefault();
+            e.target.followRef?.focus();
         }
     }
     _getFormattedValue(value) {
@@ -824,19 +873,43 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
         return arr;
     }
     get _startHandle() {
-        return this.shadowRoot.querySelector(".ui5-slider-handle--start");
+        return this.shadowRoot.querySelector("[ui5-slider-handle][handle-type='Start']");
     }
     get _endHandle() {
-        return this.shadowRoot.querySelector(".ui5-slider-handle--end");
+        return this.shadowRoot.querySelector("[ui5-slider-handle][handle-type='End']");
     }
     get _progressBar() {
-        return this.shadowRoot.querySelector(".ui5-slider-progress");
+        const sliderScale = this.shadowRoot.querySelector("[ui5-slider-scale]");
+        return sliderScale?.shadowRoot?.querySelector(".ui5-slider-progress") ?? null;
     }
     get _ariaLabelledByStartHandleText() {
         return this.accessibleName ? ["ui5-slider-accName", "ui5-slider-startHandleDesc"].join(" ").trim() : "ui5-slider-startHandleDesc";
     }
     get _ariaLabelledByEndHandleText() {
         return this.accessibleName ? ["ui5-slider-accName", "ui5-slider-endHandleDesc"].join(" ").trim() : "ui5-slider-endHandleDesc";
+    }
+    /**
+     * @private
+     */
+    get _ariaLabelStartHandle() {
+        return this._getAriaLabelHandle(this._ariaHandlesText.startHandleText || "");
+    }
+    /**
+     * @private
+     */
+    get _ariaLabelEndHandle() {
+        return this._getAriaLabelHandle(this._ariaHandlesText.endHandleText || "");
+    }
+    _getAriaLabelHandle(handleDescription) {
+        const associatedLabelText = getAssociatedLabelForTexts(this);
+        const hasAccessibleName = !!this.accessibleName;
+        let labelText = hasAccessibleName
+            ? `${this.accessibleName} ${handleDescription}`
+            : handleDescription;
+        if (!hasAccessibleName && associatedLabelText) {
+            labelText = `${associatedLabelText} ${labelText}`;
+        }
+        return labelText;
     }
     get _ariaLabelledByInputText() {
         return RangeSlider_1.i18nBundle.getText(SLIDER_TOOLTIP_INPUT_LABEL);
@@ -849,7 +922,7 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
             progress: {
                 "width": `${this._selectedRange * 100}%`,
                 "transform-origin": `${this.directionStart} top`,
-                [this.directionStart]: `${this._firstHandlePositionFromStart}%`,
+                [this.directionStart]: `calc(${this._firstHandlePositionFromStart}% + var(--_ui5_slider_active_progress_left))`,
             },
             startHandle: {
                 [this.directionStart]: `${this._firstHandlePositionFromStart}%`,
@@ -857,28 +930,33 @@ let RangeSlider = RangeSlider_1 = class RangeSlider extends SliderBase {
             endHandle: {
                 [this.directionStart]: `${this._secondHandlePositionFromStart}%`,
             },
-            label: {
-                "width": `${this._labelWidth}%`,
-            },
-            labelContainer: {
-                "width": `100%`,
-                [this.directionStart]: `-${this._labelWidth / 2}%`,
-            },
-            tooltip: {
-                "visibility": `${this._tooltipVisibility}`,
-            },
         };
     }
 };
 __decorate([
     property({ type: Number })
-], RangeSlider.prototype, "startValue", void 0);
+], RangeSlider.prototype, "startValue", null);
 __decorate([
     property({ type: Number })
-], RangeSlider.prototype, "endValue", void 0);
+], RangeSlider.prototype, "endValue", null);
+__decorate([
+    property()
+], RangeSlider.prototype, "tooltipStartValue", void 0);
+__decorate([
+    property()
+], RangeSlider.prototype, "tooltipEndValue", void 0);
+__decorate([
+    property()
+], RangeSlider.prototype, "tooltipStartValueState", void 0);
+__decorate([
+    property()
+], RangeSlider.prototype, "tooltipEndValueState", void 0);
 __decorate([
     property({ type: Boolean })
 ], RangeSlider.prototype, "rangePressed", void 0);
+__decorate([
+    property({ type: Boolean })
+], RangeSlider.prototype, "_progressFocused", void 0);
 __decorate([
     property({ type: Boolean })
 ], RangeSlider.prototype, "_isStartValueValid", void 0);
@@ -894,7 +972,7 @@ RangeSlider = RangeSlider_1 = __decorate([
         languageAware: true,
         formAssociated: true,
         template: RangeSliderTemplate,
-        styles: [SliderBase.styles, rangeSliderStyles],
+        styles: [rangeSliderStyles],
     })
 ], RangeSlider);
 RangeSlider.define();

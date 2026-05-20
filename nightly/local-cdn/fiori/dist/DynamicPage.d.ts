@@ -3,6 +3,7 @@ import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import DynamicPageHeader from "./DynamicPageHeader.js";
 import DynamicPageTitle from "./DynamicPageTitle.js";
 import type DynamicPageHeaderActions from "./DynamicPageHeaderActions.js";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 /**
  * @class
  *
@@ -95,25 +96,25 @@ declare class DynamicPage extends UI5Element {
      *
      * @public
      */
-    content: HTMLElement[];
+    content: DefaultSlot<HTMLElement>;
     /**
      * Defines the title HTML Element.
      *
      * @public
      */
-    titleArea: Array<DynamicPageTitle>;
+    titleArea: Slot<DynamicPageTitle>;
     /**
      * Defines the header HTML Element.
      *
      * @public
      */
-    headerArea: Array<DynamicPageHeader>;
+    headerArea: Slot<DynamicPageHeader>;
     /**
      * Defines the footer HTML Element.
      *
      * @public
      */
-    footerArea: HTMLElement[];
+    footerArea: Slot<HTMLElement>;
     static i18nBundle: I18nBundle;
     skipSnapOnScroll: boolean;
     showHeaderInStickArea: boolean;
@@ -123,21 +124,23 @@ declare class DynamicPage extends UI5Element {
     headerActions?: DynamicPageHeaderActions;
     constructor();
     onBeforeRendering(): void;
+    get endAreaHeight(): number;
+    get scrollPaddingTop(): number;
     get dynamicPageTitle(): DynamicPageTitle | null;
     get dynamicPageHeader(): DynamicPageHeader | null;
+    get footerWrapper(): Element | null | undefined;
     get actionsInTitle(): boolean;
     get headerInTitle(): boolean;
     get headerInContent(): boolean;
     get _headerLabel(): string;
     get _headerExpanded(): boolean;
-    get _accAttributesForHeaderActions(): {
-        controls: Lowercase<string>;
-    };
     get headerTabIndex(): 0 | -1;
     get headerAriaHidden(): boolean;
     get hasHeading(): boolean;
     get headerSnapped(): boolean;
     get hasSnappedTitleOnMobile(): number | false | undefined;
+    get headerAriaLabel(): string | undefined;
+    get _hidePinButton(): boolean;
     /**
      * Defines if the header is snapped.
      *
@@ -151,7 +154,13 @@ declare class DynamicPage extends UI5Element {
     onPinClick(): Promise<void>;
     onToggleTitle(): Promise<void>;
     _toggleHeader(): Promise<void>;
-    onExpandHoverIn(): Promise<void>;
-    onExpandHoverOut(): Promise<void>;
+    onExpandHoverIn(): void;
+    onExpandHoverOut(): void;
+    onContentFocusIn(e: FocusEvent): void;
+    onContentFocusOut(): void;
+    setScrollPadding(padding: {
+        start: number;
+        end: number;
+    }): void;
 }
 export default DynamicPage;

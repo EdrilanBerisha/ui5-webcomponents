@@ -24,7 +24,6 @@ import { TABLE_NAVIGATION } from "./generated/i18n/i18n-defaults.js";
  * @extends TableRowActionBase
  * @since 2.7.0
  * @public
- * @experimental
  */
 let TableRowActionNavigation = TableRowActionNavigation_1 = class TableRowActionNavigation extends TableRowActionBase {
     constructor() {
@@ -34,6 +33,10 @@ let TableRowActionNavigation = TableRowActionNavigation_1 = class TableRowAction
          *
          * @default false
          * @public
+         * @deprecated As of version 2.20.0, the navigation icon is deprecated.
+         * For better accessibility, the interactive mode which renders a button, must be used instead. To handle the action, attach a listener to the `click` event.
+         * If the navigation should be triggered when a row is pressed, set the row's `interactive` property and use the `row-click` event of the `ui5-table`.
+         * This property will be removed in a future release.
          */
         this.interactive = false;
     }

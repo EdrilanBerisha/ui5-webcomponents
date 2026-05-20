@@ -5,19 +5,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 var Input_1;
+/* eslint-disable spaced-comment */
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import ResizeHandler from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
-import { getScopedVarName } from "@ui5/webcomponents-base/dist/CustomElementsScope.js";
 // @ts-expect-error
 import encodeXML from "@ui5/webcomponents-base/dist/sap/base/security/encodeXML.js";
-import { isPhone, isAndroid, } from "@ui5/webcomponents-base/dist/Device.js";
+import { isPhone, isAndroid, isMac, } from "@ui5/webcomponents-base/dist/Device.js";
 import ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
-import { isUp, isDown, isSpace, isEnter, isBackSpace, isDelete, isEscape, isTabNext, isPageUp, isPageDown, isHome, isEnd, } from "@ui5/webcomponents-base/dist/Keys.js";
+import { isUp, isDown, isSpace, isEnter, isBackSpace, isDelete, isEscape, isTabNext, isPageUp, isPageDown, isHome, isEnd, isCtrlAltF8, } from "@ui5/webcomponents-base/dist/Keys.js";
+import { attachListeners } from "@ui5/webcomponents-base/dist/util/valueStateNavigation.js";
+import arraysAreEqual from "@ui5/webcomponents-base/dist/util/arraysAreEqual.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import { submitForm } from "@ui5/webcomponents-base/dist/features/InputElementsFormSupport.js";
 import { getAssociatedLabelForTexts, getAllAccessibleNameRefTexts, registerUI5Element, deregisterUI5Element, getEffectiveAriaDescriptionText, getAllAccessibleDescriptionRefTexts, } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
@@ -26,13 +28,14 @@ import getActiveElement from "@ui5/webcomponents-base/dist/util/getActiveElement
 import InputType from "./types/InputType.js";
 // Templates
 import InputTemplate from "./InputTemplate.js";
-import { StartsWith } from "./Filters.js";
-import { VALUE_STATE_SUCCESS, VALUE_STATE_INFORMATION, VALUE_STATE_ERROR, VALUE_STATE_WARNING, VALUE_STATE_TYPE_SUCCESS, VALUE_STATE_TYPE_INFORMATION, VALUE_STATE_TYPE_ERROR, VALUE_STATE_TYPE_WARNING, INPUT_SUGGESTIONS, INPUT_SUGGESTIONS_TITLE, INPUT_SUGGESTIONS_ONE_HIT, INPUT_SUGGESTIONS_MORE_HITS, INPUT_SUGGESTIONS_NO_HIT, INPUT_CLEAR_ICON_ACC_NAME, INPUT_AVALIABLE_VALUES, FORM_TEXTFIELD_REQUIRED, } from "./generated/i18n/i18n-defaults.js";
+import * as Filters from "./Filters.js";
+import { VALUE_STATE_SUCCESS, VALUE_STATE_INFORMATION, VALUE_STATE_ERROR, VALUE_STATE_WARNING, VALUE_STATE_TYPE_SUCCESS, VALUE_STATE_TYPE_INFORMATION, VALUE_STATE_TYPE_ERROR, VALUE_STATE_TYPE_WARNING, VALUE_STATE_LINK, VALUE_STATE_LINKS, VALUE_STATE_LINK_MAC, VALUE_STATE_LINKS_MAC, INPUT_SUGGESTIONS, INPUT_SUGGESTIONS_TITLE, INPUT_SUGGESTIONS_ONE_HIT, INPUT_SUGGESTIONS_MORE_HITS, INPUT_SUGGESTIONS_NO_HIT, INPUT_CLEAR_ICON_ACC_NAME, INPUT_AVALIABLE_VALUES, INPUT_SUGGESTIONS_OK_BUTTON, INPUT_SUGGESTIONS_CANCEL_BUTTON, INPUT_SUGGESTIONS_EXPANDED, INPUT_SUGGESTIONS_COLLAPSED, } from "./generated/i18n/i18n-defaults.js";
 // Styles
 import inputStyles from "./generated/themes/Input.css.js";
 import ResponsivePopoverCommonCss from "./generated/themes/ResponsivePopoverCommon.css.js";
 import ValueStateMessageCss from "./generated/themes/ValueStateMessage.css.js";
 import SuggestionsCss from "./generated/themes/Suggestions.css.js";
+import InputSuggestionsFilter from "./types/InputSuggestionsFilter.js";
 // all sementic events
 var INPUT_EVENTS;
 (function (INPUT_EVENTS) {
@@ -52,8 +55,8 @@ var INPUT_ACTIONS;
  *
  * The `ui5-input` component allows the user to enter and edit text or numeric values in one line.
  *
- * Additionally, you can provide `suggestionItems`,
- * that are displayed in a popover right under the input.
+ * Additionally, you can provide `suggestionItems`
+ * that are displayed in a popover right under the input. Keep in mind that `ui5-input` with type `Number` does not support suggestions.
  *
  * The text field can be editable or read-only (`readonly` property),
  * and it can be enabled or disabled (`disabled` property).
@@ -72,6 +75,7 @@ var INPUT_ACTIONS;
  * - [End] - If focus is in the text input, moves caret after the last character. If focus is in the list, highlights the last item and updates the input accordingly.
  * - [Page Up] - If focus is in the list, moves highlight up by page size (10 items by default). If focus is in the input, does nothing.
  * - [Page Down] - If focus is in the list, moves highlight down by page size (10 items by default). If focus is in the input, does nothing.
+ * - [Ctrl]+[Alt]+[F8] or [Command]+[Option]+[F8] - Focuses the first link in the value state message, if available. Pressing [Tab] moves the focus to the next link in the value state message, or closes the value state message if there are no more links.
  *
  * ### ES6 Module Import
  *
@@ -86,13 +90,17 @@ var INPUT_ACTIONS;
  */
 let Input = Input_1 = class Input extends UI5Element {
     get formValidityMessage() {
-        return Input_1.i18nBundle.getText(FORM_TEXTFIELD_REQUIRED);
+        return this.nativeInput?.validationMessage;
     }
     get _effectiveShowSuggestions() {
         return !!(this.showSuggestions && this.Suggestions);
     }
     get formValidity() {
-        return { valueMissing: this.required && !this.value };
+        return {
+            valueMissing: this.nativeInput?.validity.valueMissing,
+            typeMismatch: this.required && this.nativeInput?.validity.typeMismatch,
+            patternMismatch: this.nativeInput?.validity.patternMismatch,
+        };
     }
     async formElementAnchor() {
         return this.getFocusDomRefAsync();
@@ -152,6 +160,7 @@ let Input = Input_1 = class Input extends UI5Element {
          * and the current language settings, especially for type `Number`.
          * - The property is mostly intended to be used with touch devices
          * that use different soft keyboard layouts depending on the given input type.
+         * - Type `Number` does not support suggestions.
          * @default "Text"
          * @public
          */
@@ -166,14 +175,6 @@ let Input = Input_1 = class Input extends UI5Element {
          * @public
          */
         this.value = "";
-        /**
-         * Defines the inner stored value of the component.
-         *
-         * **Note:** The property is updated upon typing. In some special cases the old value is kept (e.g. deleting the value after the dot in a float)
-         * @default ""
-         * @private
-         */
-        this._innerValue = "";
         /**
          * Defines the value state of the component.
          * @default "None"
@@ -204,6 +205,13 @@ let Input = Input_1 = class Input extends UI5Element {
          */
         this.open = false;
         /**
+         * Defines the filter type of the component.
+         * @default "None"
+         * @public
+         * @since 2.19.0
+         */
+        this.filter = InputSuggestionsFilter.None;
+        /**
          * Defines whether the clear icon is visible.
          * @default false
          * @private
@@ -215,14 +223,26 @@ let Input = Input_1 = class Input extends UI5Element {
          */
         this.focused = false;
         this.valueStateOpen = false;
-        /**
-         * Indicates whether the visual focus is on the value state header
-         * @private
-         */
-        this._isValueStateFocused = false;
         this._inputAccInfo = {};
         this._nativeInputAttributes = {};
         this._inputIconFocused = false;
+        /**
+         * @private
+         */
+        this._linksListenersArray = [];
+        /**
+         * Indicates whether IME composition is currently active
+         * @default false
+         * @private
+         */
+        this._isComposing = false;
+        /**
+         * Indicates whether link navigation is being handled.
+         * @default false
+         * @private
+         * @since 2.11.0
+         */
+        this._handleLinkNavigation = false;
         // Indicates if there is selected suggestionItem.
         this.hasSuggestionItemSelected = false;
         // Represents the value before user moves selection from suggestion item to another
@@ -249,16 +269,19 @@ let Input = Input_1 = class Input extends UI5Element {
         this._isChangeTriggeredBySuggestion = false;
         this._indexOfSelectedItem = -1;
         this._handleResizeBound = this._handleResize.bind(this);
-        this._keepInnerValue = false;
         this._focusedAfterClear = false;
+        this._valueStateLinks = [];
     }
     onEnterDOM() {
         ResizeHandler.register(this, this._handleResizeBound);
         registerUI5Element(this, this._updateAssociatedLabelsTexts.bind(this));
+        this._enableComposition();
     }
     onExitDOM() {
         ResizeHandler.deregister(this, this._handleResizeBound);
         deregisterUI5Element(this);
+        this._removeLinksEventListeners();
+        this._composition?.removeEventListeners();
     }
     _highlightSuggestionItem(item) {
         item.markupText = this.typedInValue ? this.Suggestions?.hightlightInput((item.text || ""), this.typedInValue) : encodeXML(item.text || "");
@@ -267,9 +290,6 @@ let Input = Input_1 = class Input extends UI5Element {
         return item.hasAttribute("ui5-suggestion-item-group");
     }
     onBeforeRendering() {
-        if (!this._keepInnerValue) {
-            this._innerValue = this.value === null ? "" : this.value;
-        }
         if (this.showSuggestions) {
             this.enableSuggestions();
             this._flattenItems.forEach(item => {
@@ -284,27 +304,31 @@ let Input = Input_1 = class Input extends UI5Element {
             });
         }
         this._effectiveShowClearIcon = (this.showClearIcon && !!this.value && !this.readonly && !this.disabled);
-        this.style.setProperty(getScopedVarName("--_ui5-input-icons-count"), `${this.iconsCount}`);
+        this.style.setProperty("--_ui5-input-icons-count", `${this.iconsCount}`);
         const hasItems = !!this._flattenItems.length;
         const hasValue = !!this.value;
         const isFocused = this.shadowRoot.querySelector("input") === getActiveElement();
-        if (this.shouldDisplayOnlyValueStateMessage) {
-            this.openValueStatePopover();
-        }
-        else {
-            this.closeValueStatePopover();
-        }
         const preventOpenPicker = this.disabled || this.readonly;
+        const shouldOpenSuggestions = !preventOpenPicker && !this._isPhone && hasItems && (this.open || (hasValue && isFocused && this.isTyping));
         if (preventOpenPicker) {
             this.open = false;
         }
         else if (!this._isPhone) {
             this.open = hasItems && (this.open || (hasValue && isFocused && this.isTyping));
         }
+        if (this.shouldDisplayOnlyValueStateMessage && !shouldOpenSuggestions) {
+            this.openValueStatePopover();
+        }
+        else {
+            this.closeValueStatePopover();
+        }
         const value = this.value;
         const innerInput = this.getInputDOMRefSync();
         if (!innerInput || !value) {
             return;
+        }
+        if (this.filter !== InputSuggestionsFilter.None) {
+            this._filterItems(this.typedInValue);
         }
         const autoCompletedChars = innerInput.selectionEnd - innerInput.selectionStart;
         // Typehead causes issues on Android devices, so we disable it for now
@@ -312,13 +336,17 @@ let Input = Input_1 = class Input extends UI5Element {
         if (this._shouldAutocomplete && !isAndroid() && !autoCompletedChars && !this._isKeyNavigation) {
             const item = this._getFirstMatchingItem(value);
             if (item) {
-                this._handleTypeAhead(item);
+                if (!this._isComposing) {
+                    this._handleTypeAhead(item);
+                }
                 this._selectMatchingItem(item);
+            }
+            else {
+                this._matchedSuggestionItem = undefined;
             }
         }
     }
     onAfterRendering() {
-        const innerInput = this.getInputDOMRefSync();
         if (this.showSuggestions && this.Suggestions?._getPicker()) {
             this._listWidth = this.Suggestions._getListWidth();
             // disabled ItemNavigation from the list since we are not using it
@@ -327,15 +355,39 @@ let Input = Input_1 = class Input extends UI5Element {
         if (this._performTextSelection) {
             // this is required to syncronize lit-html input's value and user's input
             // lit-html does not sync its stored value for the value property when the user is typing
-            if (innerInput.value !== this._innerValue) {
-                innerInput.value = this._innerValue;
-            }
+            // if (innerInput.value !== this._innerValue) {
+            // 	innerInput.value = this._innerValue;
+            // }
             if (this.typedInValue.length && this.value.length) {
-                innerInput.setSelectionRange(this.typedInValue.length, this.value.length);
+                this._adjustSelectionRange();
             }
             this.fireDecoratorEvent("type-ahead");
         }
         this._performTextSelection = false;
+        if (!arraysAreEqual(this._valueStateLinks, this.linksInAriaValueStateHiddenText)) {
+            this._removeLinksEventListeners();
+            this._addLinksEventListeners();
+            this._valueStateLinks = this.linksInAriaValueStateHiddenText;
+        }
+    }
+    _adjustSelectionRange() {
+        const innerInput = this.getInputDOMRefSync();
+        const visibleItems = this.Suggestions?._getItems().filter(item => !item.hidden);
+        const currentItem = visibleItems?.find(item => { return item.selected || item.focused; });
+        const groupItems = this._flattenItems.filter(item => this._isGroupItem(item));
+        if (currentItem && !groupItems.includes(currentItem)) {
+            const doesItemStartWithTypedValue = currentItem?.text?.toLowerCase().startsWith(this.typedInValue.toLowerCase());
+            if (doesItemStartWithTypedValue) {
+                innerInput.setSelectionRange(this.typedInValue.length, this.value.length);
+            }
+            else {
+                innerInput.setSelectionRange(0, this.value.length);
+            }
+        }
+        else {
+            // No current item selected (e.g., during typing) - use default typeahead selection
+            innerInput.setSelectionRange(this.typedInValue.length, this.value.length);
+        }
     }
     _onkeydown(e) {
         this._isKeyNavigation = true;
@@ -355,8 +407,10 @@ let Input = Input_1 = class Input extends UI5Element {
         if (isEnter(e)) {
             const isValueUnchanged = this.previousValue === this.getInputDOMRefSync().value;
             this._enterKeyDown = true;
-            if (isValueUnchanged && this._internals.form) {
+            if (isValueUnchanged) {
+                this.fireDecoratorEvent("_request-submit");
                 submitForm(this);
+                return;
             }
             return this._handleEnter(e);
         }
@@ -375,6 +429,9 @@ let Input = Input_1 = class Input extends UI5Element {
         if (isEscape(e)) {
             return this._handleEscape();
         }
+        if (isCtrlAltF8(e)) {
+            return this._handleCtrlAltF8();
+        }
         if (this.showSuggestions) {
             this._clearPopoverFocusAndSelection();
         }
@@ -390,8 +447,9 @@ let Input = Input_1 = class Input extends UI5Element {
     }
     get currentItemIndex() {
         const allItems = this.Suggestions?._getItems();
-        const currentItem = allItems.find(item => { return item.selected || item.focused; });
-        const indexOfCurrentItem = currentItem ? allItems.indexOf(currentItem) : -1;
+        const visibleItems = allItems.filter(item => !item.hidden);
+        const currentItem = visibleItems.find(item => { return item.selected || item.focused; });
+        const indexOfCurrentItem = currentItem ? visibleItems.indexOf(currentItem) : -1;
         return indexOfCurrentItem;
     }
     _handleUp(e) {
@@ -414,13 +472,67 @@ let Input = Input_1 = class Input extends UI5Element {
             this.Suggestions.onTab();
         }
     }
+    _handleCtrlAltF8() {
+        this._handleLinkNavigation = true;
+        const links = this.linksInAriaValueStateHiddenText;
+        if (links.length) {
+            links[0].focus();
+        }
+    }
+    _addLinksEventListeners() {
+        const links = this.linksInAriaValueStateHiddenText;
+        links.forEach((link, index) => {
+            this._linksListenersArray.push((e) => {
+                attachListeners(e, links, index, {
+                    closeValueState: () => {
+                        if (this.Suggestions?.isOpened()) {
+                            this.Suggestions?.close();
+                        }
+                        if (this.valueStateOpen) {
+                            this.closeValueStatePopover();
+                        }
+                    },
+                    focusInput: () => {
+                        this._handleLinkNavigation = false;
+                        this.getInputDOMRef().focus();
+                    },
+                    navigateToItem: () => {
+                        if (this._handleLinkNavigation) {
+                            this._handleLinkNavigation = false;
+                            if (this.Suggestions?.isOpened()) {
+                                this.innerFocusIn();
+                                (this.getInputDOMRef()).focus();
+                                this.Suggestions.onDown(e, this.currentItemIndex);
+                            }
+                        }
+                        else {
+                            this._handleDown(e);
+                        }
+                    },
+                    isPopoverOpen: () => { return (this.Suggestions && this.Suggestions?.isOpened()) || false; },
+                });
+            });
+            link.addEventListener("keydown", this._linksListenersArray[index]);
+        });
+    }
+    _removeLinksEventListeners() {
+        const links = this.linksInAriaValueStateHiddenText;
+        links.forEach((link, index) => {
+            link.removeEventListener("keydown", this._linksListenersArray[index]);
+        });
+        this._linksListenersArray = [];
+        this._handleLinkNavigation = false;
+    }
     _handleEnter(e) {
         // if a group item is focused, this is false
         const suggestionItemPressed = !!(this.Suggestions?.onEnter(e));
         const innerInput = this.getInputDOMRefSync();
-        const matchingItem = this._selectableItems.find(item => {
-            return item.text === this.value;
-        });
+        let matchingItem = this._matchedSuggestionItem;
+        if (!matchingItem) {
+            matchingItem = this._selectableItems.find(item => {
+                return item.text?.toLowerCase() === this.value.toLowerCase();
+            });
+        }
         if (matchingItem) {
             const itemText = matchingItem.text || "";
             innerInput.setSelectionRange(itemText.length, itemText.length);
@@ -471,9 +583,10 @@ let Input = Input_1 = class Input extends UI5Element {
         const innerInput = this.getInputDOMRefSync();
         const isAutoCompleted = innerInput.selectionEnd - innerInput.selectionStart > 0;
         this.isTyping = false;
+        this._matchedSuggestionItem = undefined;
         if (this.value !== this.previousValue && this.value !== this.lastConfirmedValue && !this.open) {
             this.value = this.lastConfirmedValue ? this.lastConfirmedValue : this.previousValue;
-            this.fireDecoratorEvent(INPUT_EVENTS.INPUT);
+            this.fireDecoratorEvent(INPUT_EVENTS.INPUT, { inputType: "" });
             return;
         }
         if (!isOpen) {
@@ -489,10 +602,7 @@ let Input = Input_1 = class Input extends UI5Element {
         if (isAutoCompleted) {
             this.value = this.typedInValue;
         }
-        if (this._isValueStateFocused) {
-            this._isValueStateFocused = false;
-            this.focused = true;
-        }
+        this.focused = true;
     }
     _onfocusin(e) {
         this.focused = true; // invalidating property
@@ -510,10 +620,9 @@ let Input = Input_1 = class Input extends UI5Element {
     innerFocusIn() { }
     _onfocusout(e) {
         const toBeFocused = e.relatedTarget;
-        if (this.Suggestions?._getPicker().contains(toBeFocused) || this.contains(toBeFocused) || this.getSlottedNodes("valueStateMessage").some(el => el.contains(toBeFocused))) {
+        if (this.Suggestions?._getPicker()?.contains(toBeFocused) || this.contains(toBeFocused) || this.getSlottedNodes("valueStateMessage").some(el => el.contains(toBeFocused))) {
             return;
         }
-        this._keepInnerValue = false;
         this.focused = false; // invalidating property
         this._isChangeTriggeredBySuggestion = false;
         if (this.showClearIcon && !this._effectiveShowClearIcon) {
@@ -527,12 +636,14 @@ let Input = Input_1 = class Input extends UI5Element {
         }
         this.lastConfirmedValue = "";
         this.isTyping = false;
+        if ((this.value !== this.previousValue) && this.showClearIcon) {
+            this._clearIconClicked = false;
+        }
     }
     _clearPopoverFocusAndSelection() {
         if (!this.showSuggestions || !this.Suggestions) {
             return;
         }
-        this._isValueStateFocused = false;
         this.hasSuggestionItemSelected = false;
         this.Suggestions?._deselectItems();
         this.Suggestions?._clearItemFocus();
@@ -558,12 +669,13 @@ let Input = Input_1 = class Input extends UI5Element {
         };
         if (this.previousValue !== this.getInputDOMRefSync().value) {
             // if picker is open there might be a selected item, wait next tick to get the value applied
-            if (this.Suggestions?._getPicker().open && this._flattenItems.some(item => item.hasAttribute("ui5-suggestion-item") && item.selected)) {
+            if (this.Suggestions?._getPicker()?.open && this._flattenItems.some(item => item.hasAttribute("ui5-suggestion-item") && item.selected)) {
                 this._changeToBeFired = true;
             }
             else {
                 fireChange();
-                if (this._enterKeyDown && this._internals.form) {
+                if (this._enterKeyDown) {
+                    this.fireDecoratorEvent("_request-submit");
                     submitForm(this);
                 }
             }
@@ -577,6 +689,7 @@ let Input = Input_1 = class Input extends UI5Element {
             this.value = valueBeforeClear;
             return;
         }
+        this.typedInValue = "";
         if (!this._isPhone) {
             this.fireResetSelectionChange();
             this.focus();
@@ -605,8 +718,6 @@ let Input = Input_1 = class Input extends UI5Element {
     }
     _input(e, eventType) {
         const inputDomRef = this.getInputDOMRefSync();
-        const emptyValueFiredOnNumberInput = this.value && this.isTypeNumber && !inputDomRef.value;
-        this._keepInnerValue = false;
         const allowedEventTypes = [
             "deleteWordBackward",
             "deleteWordForward",
@@ -623,35 +734,6 @@ let Input = Input_1 = class Input extends UI5Element {
             "historyUndo",
         ];
         this._shouldAutocomplete = !allowedEventTypes.includes(eventType) && !this.noTypeahead;
-        if (e instanceof InputEvent) {
-            // ---- Special cases of numeric Input ----
-            // ---------------- Start -----------------
-            // When the last character after the delimiter is removed.
-            // In such cases, we want to skip the re-rendering of the
-            // component as this leads to cursor repositioning and causes user experience issues.
-            // There are few scenarios:
-            // Example: type "123.4" and press BACKSPACE - the native input is firing event with the whole part as value (123).
-            // Pressing BACKSPACE again will remove the delimiter and the native input will fire event with the whole part as value again (123).
-            // Example: type "123.456", select/mark "456" and press BACKSPACE - the native input is firing event with the whole part as value (123).
-            // Example: type "123.456", select/mark "123.456" and press BACKSPACE - the native input is firing event with empty value.
-            const delimiterCase = this.isTypeNumber
-                && (e.inputType === "deleteContentForward" || e.inputType === "deleteContentBackward")
-                && !e.target.value.includes(".")
-                && this.value.includes(".");
-            // Handle special numeric notation with "e", example "12.5e12"
-            const eNotationCase = emptyValueFiredOnNumberInput && e.data === "e";
-            // Handle special numeric notation with "-", example "-3"
-            // When pressing BACKSPACE, the native input fires event with empty value
-            const minusRemovalCase = emptyValueFiredOnNumberInput
-                && this.value.startsWith("-")
-                && this.value.length === 2
-                && (e.inputType === "deleteContentForward" || e.inputType === "deleteContentBackward");
-            if (delimiterCase || eNotationCase || minusRemovalCase) {
-                this.value = e.target.value;
-                this._keepInnerValue = true;
-            }
-            // ----------------- End ------------------
-        }
         if (e.target === inputDomRef) {
             this.focused = true;
             // stop the native event, as the semantic "input" would be fired.
@@ -659,14 +741,16 @@ let Input = Input_1 = class Input extends UI5Element {
         }
         this.fireEventByAction(INPUT_ACTIONS.ACTION_ENTER, e);
         this.hasSuggestionItemSelected = false;
-        this._isValueStateFocused = false;
         if (this.Suggestions) {
             this.Suggestions.updateSelectedItemPosition(-1);
+        }
+        if (this.filter && e.target.value === "") {
+            this.open = false;
         }
         this.isTyping = true;
     }
     _startsWithMatchingItems(str) {
-        return StartsWith(str, this._selectableItems, "text");
+        return Filters.StartsWith(str, this._selectableItems, "text");
     }
     _getFirstMatchingItem(current) {
         if (!this._flattenItems.length) {
@@ -682,11 +766,57 @@ let Input = Input_1 = class Input extends UI5Element {
     }
     _selectMatchingItem(item) {
         item.selected = true;
+        this._matchedSuggestionItem = item;
+    }
+    _filterItems(value) {
+        let matchingItems = [];
+        const groupItems = this._flattenItems.filter(item => this._isGroupItem(item));
+        this._resetItemVisibility();
+        if (groupItems.length) {
+            matchingItems = this._filterGroups(this.filter, groupItems);
+        }
+        else {
+            matchingItems = (Filters[this.filter])(value, this._selectableItems, "text");
+        }
+        this._selectableItems.forEach(item => {
+            item.hidden = !matchingItems.includes(item);
+        });
+        if (matchingItems.length === 0) {
+            this.open = false;
+        }
+    }
+    _filterGroups(filterType, groupItems) {
+        const filteredGroupItems = [];
+        groupItems.forEach(groupItem => {
+            const currentGroupItems = (Filters[filterType])(this.typedInValue, groupItem.items ?? [], "text");
+            filteredGroupItems.push(...currentGroupItems);
+            if (currentGroupItems.length === 0) {
+                groupItem.hidden = true;
+            }
+            else {
+                groupItem.hidden = false;
+            }
+        });
+        return filteredGroupItems;
+    }
+    _resetItemVisibility() {
+        this._flattenItems.forEach(item => {
+            if (this._isGroupItem(item)) {
+                item.items?.forEach(i => {
+                    i.hidden = false;
+                });
+                return;
+            }
+            item.hidden = false;
+        });
     }
     _handleTypeAhead(item) {
-        const value = item.text ? item.text : "";
-        this._innerValue = value;
-        this.value = value;
+        const suggestionText = item.text ? item.text : "";
+        const typedValue = this.typedInValue;
+        // Preserve the user's typed input case during typing
+        if (suggestionText.toLowerCase().startsWith(typedValue.toLowerCase())) {
+            this.value = typedValue + suggestionText.substring(typedValue.length);
+        }
         this._performTextSelection = true;
         this._shouldAutocomplete = false;
     }
@@ -701,15 +831,24 @@ let Input = Input_1 = class Input extends UI5Element {
     _closePicker() {
         this.open = false;
     }
+    _confirmMobileValue() {
+        this._closePicker();
+        this._handleChange();
+    }
+    _cancelMobileValue() {
+        this.value = this.previousValue;
+        this._closePicker();
+    }
     _afterOpenPicker() {
         // Set initial focus to the native input
         if (isPhone()) {
+            this.previousValue = this.value;
             (this.getInputDOMRef()).focus();
+            this._composition?.addEventListeners();
         }
         this._handlePickerAfterOpen();
     }
     _afterClosePicker() {
-        this.announceSelectedItem();
         // close device's keyboard and prevent further typing
         if (isPhone()) {
             this.blur();
@@ -728,6 +867,10 @@ let Input = Input_1 = class Input extends UI5Element {
         if (this.hasSuggestionItemSelected) {
             this.focus();
         }
+        const invisibleText = this.shadowRoot.querySelector(`#selectionText`);
+        if (invisibleText) {
+            invisibleText.textContent = "";
+        }
         this._handlePickerAfterClose();
     }
     _handlePickerAfterOpen() {
@@ -745,6 +888,7 @@ let Input = Input_1 = class Input extends UI5Element {
     }
     _handleValueStatePopoverAfterClose() {
         this.valueStateOpen = false;
+        this._handleLinkNavigation = false;
     }
     _getValueStatePopover() {
         return this.shadowRoot.querySelector("[ui5-popover]");
@@ -768,14 +912,50 @@ let Input = Input_1 = class Input extends UI5Element {
             });
         }
     }
+    /**
+     * Enables IME composition handling.
+     * Dynamically loads the InputComposition feature and sets up event listeners.
+     * @private
+     */
+    _enableComposition() {
+        if (this._composition) {
+            return;
+        }
+        const setup = (FeatureClass) => {
+            this._composition = new FeatureClass({
+                getInputEl: () => this.getInputDOMRefSync(),
+                updateCompositionState: (isComposing) => {
+                    this._isComposing = isComposing;
+                },
+            });
+            this._composition.addEventListeners();
+        };
+        if (Input_1.composition) {
+            setup(Input_1.composition);
+        }
+        else {
+            import("./features/InputComposition.js").then(CompositionModule => {
+                Input_1.composition = CompositionModule.default;
+                setup(CompositionModule.default);
+            });
+        }
+    }
     acceptSuggestion(item, keyboardUsed) {
         if (this._isGroupItem(item)) {
             return;
         }
-        const value = this.typedInValue || this.value;
-        const itemText = item.text || "";
+        let originalItem = item;
+        if (this._matchedSuggestionItem) {
+            const matchedText = this._matchedSuggestionItem.text?.toLowerCase() || "";
+            const itemText = item.text?.toLowerCase() || "";
+            // Only use matched item if keyboard navigation or if it's the same item (case-insensitive)
+            if (keyboardUsed || matchedText === itemText) {
+                originalItem = this._matchedSuggestionItem;
+            }
+        }
+        const itemText = originalItem.text || "";
         const fireChange = keyboardUsed
-            ? this.valueBeforeItemSelection !== itemText : value !== itemText;
+            ? this.valueBeforeItemSelection !== itemText : this.previousValue !== itemText;
         this.hasSuggestionItemSelected = true;
         this.value = itemText;
         if (fireChange && (this.previousValue !== itemText)) {
@@ -789,6 +969,7 @@ let Input = Input_1 = class Input extends UI5Element {
             this.previousValue = this.value;
         }
         this.valueBeforeSelectionStart = "";
+        this._matchedSuggestionItem = undefined;
         this.isTyping = false;
         this.open = false;
     }
@@ -800,6 +981,10 @@ let Input = Input_1 = class Input extends UI5Element {
         const itemValue = this._isGroupItem(item) ? this.valueBeforeSelectionStart : item.text;
         this.value = itemValue || "";
         this._performTextSelection = true;
+        // Update the matched item when navigating with arrows to preserve correct case on Enter
+        if (!this._isGroupItem(item)) {
+            this._matchedSuggestionItem = item;
+        }
     }
     fireEventByAction(action, e) {
         const valueBeforeInput = this.value;
@@ -835,13 +1020,19 @@ let Input = Input_1 = class Input extends UI5Element {
     }
     getInputDOMRef() {
         if (isPhone() && this.Suggestions) {
-            return this.Suggestions._getPicker().querySelector(".ui5-input-inner-phone");
+            const picker = this.Suggestions._getPicker();
+            if (picker) {
+                return picker.querySelector(".ui5-input-inner-phone");
+            }
         }
         return this.nativeInput;
     }
     getInputDOMRefSync() {
-        if (isPhone() && this.Suggestions?._getPicker()) {
-            return this.Suggestions._getPicker().querySelector(".ui5-input-inner-phone").shadowRoot.querySelector("input");
+        if (isPhone() && this.Suggestions) {
+            const picker = this.Suggestions._getPicker();
+            if (picker) {
+                return picker.querySelector(".ui5-input-inner-phone").shadowRoot.querySelector("input");
+            }
         }
         return this.nativeInput;
     }
@@ -925,13 +1116,20 @@ let Input = Input_1 = class Input extends UI5Element {
     fireResetSelectionChange() {
         if (this._isLatestValueFromSuggestions) {
             this.fireSelectionChange(null, false);
+            this.valueBeforeItemSelection = this.value;
         }
     }
     get _readonly() {
         return this.readonly && !this.disabled;
     }
     get _headerTitleText() {
-        return Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_TITLE);
+        return this._associatedLabelsTexts || Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_TITLE);
+    }
+    get _suggestionsOkButtonText() {
+        return Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_OK_BUTTON);
+    }
+    get _suggestionsCancelButtonText() {
+        return Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_CANCEL_BUTTON);
     }
     get clearIconAccessibleName() {
         return Input_1.i18nBundle.getText(INPUT_CLEAR_ICON_ACC_NAME);
@@ -971,6 +1169,7 @@ let Input = Input_1 = class Input extends UI5Element {
         return [
             this.suggestionsTextId,
             this.valueStateTextId,
+            this._valueStateLinksShortcutsTextAccId,
             this._inputAccInfo.ariaDescribedBy,
             this._accInfoAriaDescriptionId,
             this.ariaDescriptionTextId,
@@ -1008,10 +1207,40 @@ let Input = Input_1 = class Input extends UI5Element {
         if (this.shouldDisplayDefaultValueStateMessage) {
             return this.valueStateText ? `${valueState} ${this.valueStateText}` : valueState;
         }
-        return `${valueState}`.concat(" ", this.valueStateMessage.map(el => el.textContent).join(" "));
+        return this.valueStateMessage.length ? `${valueState} ${this.valueStateMessage.map(el => el.textContent).join(" ")}` : valueState;
     }
     get itemSelectionAnnounce() {
         return this.Suggestions ? this.Suggestions.itemSelectionAnnounce : "";
+    }
+    get linksInAriaValueStateHiddenText() {
+        const links = [];
+        if (this.valueStateMessage) {
+            this.valueStateMessage.forEach(element => {
+                if (element.children.length) {
+                    element.querySelectorAll("ui5-link").forEach(link => {
+                        links.push(link);
+                    });
+                }
+            });
+        }
+        return links;
+    }
+    get valueStateLinksShortcutsTextAcc() {
+        const links = this.linksInAriaValueStateHiddenText;
+        if (!links.length) {
+            return "";
+        }
+        if (isMac()) {
+            return links.length === 1
+                ? Input_1.i18nBundle.getText(VALUE_STATE_LINK_MAC)
+                : Input_1.i18nBundle.getText(VALUE_STATE_LINKS_MAC);
+        }
+        return links.length === 1
+            ? Input_1.i18nBundle.getText(VALUE_STATE_LINK)
+            : Input_1.i18nBundle.getText(VALUE_STATE_LINKS);
+    }
+    get _valueStateLinksShortcutsTextAccId() {
+        return this.linksInAriaValueStateHiddenText.length > 0 ? `hiddenText-value-state-link-shortcut` : "";
     }
     get iconsCount() {
         const slottedIconsCount = this.icon ? this.icon.length : 0;
@@ -1036,18 +1265,16 @@ let Input = Input_1 = class Input extends UI5Element {
         };
     }
     get styles() {
-        const remSizeIxPx = parseInt(getComputedStyle(document.documentElement).fontSize);
+        const remSizeInPx = parseInt(getComputedStyle(document.documentElement).fontSize);
         const stylesObject = {
-            popoverHeader: {
-                "max-width": this._inputWidth ? `${this._inputWidth}px` : "",
-            },
             suggestionPopoverHeader: {
                 "display": this._listWidth === 0 ? "none" : "inline-block",
                 "width": this._listWidth ? `${this._listWidth}px` : "",
+                "max-width": "inherit",
             },
             suggestionsPopover: {
                 "min-width": this._inputWidth ? `${this._inputWidth}px` : "",
-                "max-width": this._inputWidth && (this._inputWidth / remSizeIxPx) > 40 ? `${this._inputWidth}px` : "40rem",
+                "max-width": this._inputWidth && (this._inputWidth / remSizeInPx) > 40 ? `${this._inputWidth}px` : "40rem",
             },
             innerInput: {
                 "padding": "",
@@ -1081,16 +1308,18 @@ let Input = Input_1 = class Input extends UI5Element {
     get availableSuggestionsCount() {
         if (this.showSuggestions && (this.value || this.Suggestions?.isOpened())) {
             const nonGroupItems = this._selectableItems;
+            const isOpened = this.Suggestions?.isOpened();
+            const stateText = isOpened ? Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_EXPANDED) : Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_COLLAPSED);
             switch (nonGroupItems.length) {
                 case 0:
-                    return Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_NO_HIT);
+                    return `${Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_NO_HIT)} ${stateText}`;
                 case 1:
-                    return Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_ONE_HIT);
+                    return `${Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_ONE_HIT)} ${stateText}`;
                 default:
-                    return Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_MORE_HITS, nonGroupItems.length);
+                    return `${Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_MORE_HITS, nonGroupItems.length)} ${stateText}`;
             }
         }
-        return undefined;
+        return this.showSuggestions ? Input_1.i18nBundle.getText(INPUT_SUGGESTIONS_COLLAPSED) : undefined;
     }
     get step() {
         return this.isTypeNumber ? "any" : undefined;
@@ -1126,9 +1355,6 @@ let Input = Input_1 = class Input extends UI5Element {
 			`;
         }
         return "";
-    }
-    get _valueStatePopoverHorizontalAlign() {
-        return this.effectiveDir !== "rtl" ? "Start" : "End";
     }
     /**
      * This method is relevant for sap_horizon theme only
@@ -1195,9 +1421,6 @@ __decorate([
     property()
 ], Input.prototype, "value", void 0);
 __decorate([
-    property({ noAttribute: true })
-], Input.prototype, "_innerValue", void 0);
-__decorate([
     property()
 ], Input.prototype, "valueState", void 0);
 __decorate([
@@ -1228,17 +1451,20 @@ __decorate([
     property({ type: Boolean })
 ], Input.prototype, "open", void 0);
 __decorate([
+    property()
+], Input.prototype, "filter", void 0);
+__decorate([
     property({ type: Boolean })
 ], Input.prototype, "_effectiveShowClearIcon", void 0);
 __decorate([
     property({ type: Boolean })
 ], Input.prototype, "focused", void 0);
 __decorate([
-    property({ type: Boolean })
-], Input.prototype, "valueStateOpen", void 0);
+    property()
+], Input.prototype, "hint", void 0);
 __decorate([
     property({ type: Boolean })
-], Input.prototype, "_isValueStateFocused", void 0);
+], Input.prototype, "valueStateOpen", void 0);
 __decorate([
     property({ type: Object })
 ], Input.prototype, "_inputAccInfo", void 0);
@@ -1266,6 +1492,12 @@ __decorate([
 __decorate([
     property({ type: Object })
 ], Input.prototype, "Suggestions", void 0);
+__decorate([
+    property({ type: Array, noAttribute: true })
+], Input.prototype, "_linksListenersArray", void 0);
+__decorate([
+    property({ type: Boolean, noAttribute: true })
+], Input.prototype, "_isComposing", void 0);
 __decorate([
     slot({ type: HTMLElement, "default": true })
 ], Input.prototype, "suggestionItems", void 0);
@@ -1301,6 +1533,9 @@ Input = Input_1 = __decorate([
      */
     ,
     event("change", {
+        bubbles: true,
+    }),
+    event("_request-submit", {
         bubbles: true,
     })
     /**

@@ -9,7 +9,7 @@ import customElement from "@ui5/webcomponents-base/dist/decorators/customElement
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
 import ListItemType from "@ui5/webcomponents/dist/types/ListItemType.js";
@@ -121,6 +121,7 @@ let UploadCollectionItem = UploadCollectionItem_1 = class UploadCollectionItem e
     async onDetailClick() {
         super.onDetailClick();
         this._editing = true;
+        this._editMode = true;
         await this._initInputField();
     }
     async _initInputField() {
@@ -140,6 +141,9 @@ let UploadCollectionItem = UploadCollectionItem_1 = class UploadCollectionItem e
     }
     _onkeyup(e) {
         super._onkeyup(e);
+        if (this.getFocusDomRef().matches(":has(:focus-within)")) {
+            return;
+        }
         if (isDelete(e) && !this.disableDeleteButton && !this.hideDeleteButton && !this.disabled) {
             this._onDelete();
         }
@@ -169,6 +173,7 @@ let UploadCollectionItem = UploadCollectionItem_1 = class UploadCollectionItem e
         this.fileName = inp.value + this._fileExtension;
         this.fireDecoratorEvent("rename");
         this._editing = false;
+        this._editMode = false;
         this._focus();
     }
     _onRenameKeyup(e) {
@@ -178,6 +183,7 @@ let UploadCollectionItem = UploadCollectionItem_1 = class UploadCollectionItem e
     }
     async _onRenameCancel(e) {
         this._editing = false;
+        this._editMode = false;
         if (isEscape(e)) {
             await renderFinished();
             this.shadowRoot.querySelector(`#${this._id}-editing-button`).focus();
@@ -189,6 +195,27 @@ let UploadCollectionItem = UploadCollectionItem_1 = class UploadCollectionItem e
     _onRenameCancelKeyup(e) {
         if (isSpace(e)) {
             this._onRenameCancel(e);
+        }
+    }
+    _handleTabNext(e) {
+        if (this._editMode) {
+            return super._handleTabNext(e);
+        }
+        if (this.shouldForwardTabAfter()) {
+            if (!this.fireDecoratorEvent("forward-after")) {
+                e.preventDefault();
+            }
+        }
+    }
+    _handleTabPrevious(e) {
+        if (this._editMode) {
+            return super._handleTabPrevious(e);
+        }
+        const target = e.target;
+        if (this.shouldForwardTabBefore(target)) {
+            if (!this.fireDecoratorEvent("forward-before")) {
+                e.preventDefault();
+            }
         }
     }
     _focus() {

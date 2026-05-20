@@ -12,12 +12,14 @@ import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import { isEnter } from "@ui5/webcomponents-base/dist/Keys.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { getScopedVarName } from "@ui5/webcomponents-base/dist/CustomElementsScope.js";
+import { getEffectiveAriaLabelText } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 import { getRGBColor, getAlpha, } from "@ui5/webcomponents-base/dist/util/ColorConversion.js";
 import "@ui5/webcomponents-icons/dist/expand.js";
 import ColorValue from "./colorpicker-utils/ColorValue.js";
 import ColorPickerTemplate from "./ColorPickerTemplate.js";
-import { COLORPICKER_ALPHA_SLIDER, COLORPICKER_HUE_SLIDER, COLORPICKER_HEX, COLORPICKER_RED, COLORPICKER_GREEN, COLORPICKER_BLUE, COLORPICKER_ALPHA, COLORPICKER_SATURATION, COLORPICKER_LIGHT, COLORPICKER_HUE, COLORPICKER_TOGGLE_MODE_TOOLTIP, } from "./generated/i18n/i18n-defaults.js";
+import announce from "@ui5/webcomponents-base/dist/util/InvisibleMessage.js";
+import InvisibleMessageMode from "@ui5/webcomponents-base/dist/types/InvisibleMessageMode.js";
+import { COLORPICKER_LABEL, COLORPICKER_SLIDER_GROUP, COLORPICKER_ALPHA_SLIDER, COLORPICKER_HUE_SLIDER, COLORPICKER_HEX, COLORPICKER_RED, COLORPICKER_GREEN, COLORPICKER_BLUE, COLORPICKER_ALPHA, COLORPICKER_SATURATION, COLORPICKER_LIGHT, COLORPICKER_HUE, COLORPICKER_TOGGLE_MODE_TOOLTIP, COLORPICKER_PERCENTAGE, COLORPICKER_COLOR_MODE_CHANGED, } from "./generated/i18n/i18n-defaults.js";
 // Styles
 import ColorPickerCss from "./generated/themes/ColorPicker.css.js";
 const PICKER_POINTER_WIDTH = 6.5;
@@ -122,7 +124,7 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
         }
         const tempColor = this._colorValue.toRGBString();
         this._updateColorGrid();
-        this.style.setProperty(getScopedVarName("--ui5_Color_Picker_Progress_Container_Color"), tempColor);
+        this.style.setProperty("--ui5_Color_Picker_Progress_Container_Color", tempColor);
     }
     _handleMouseDown(e) {
         this.mouseDown = true;
@@ -176,6 +178,7 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
     }
     _handleAlphaInput(e) {
         const aphaInputValue = String(e.currentTarget.value);
+        this._alphaTemp = aphaInputValue;
         this._alpha = parseFloat(aphaInputValue);
         if (Number.isNaN(this._alpha)) {
             this._alpha = 1;
@@ -198,6 +201,9 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
     _handleHEXChange(e) {
         const input = e.target;
         let inputValueLowerCase = input.value.toLowerCase();
+        if (inputValueLowerCase.startsWith("#")) {
+            inputValueLowerCase = inputValueLowerCase.slice(1);
+        }
         // Shorthand Syntax
         if (inputValueLowerCase.length === 3) {
             inputValueLowerCase = `${inputValueLowerCase[0]}${inputValueLowerCase[0]}${inputValueLowerCase[1]}${inputValueLowerCase[1]}${inputValueLowerCase[2]}${inputValueLowerCase[2]}`;
@@ -219,30 +225,40 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
     }
     _togglePickerMode() {
         this._displayHSL = !this._displayHSL;
+        // Announce a message to screen readers
+        announce(this.colorFieldsAnnouncementText, InvisibleMessageMode.Polite);
     }
     _handleColorInputChange(e) {
         const target = e.target;
         const targetValue = parseInt(target.value) || 0;
+        let normalizedValue = targetValue;
         switch (target.id) {
             case "red":
                 this._colorValue.R = targetValue;
+                normalizedValue = this._colorValue.R;
                 break;
             case "green":
                 this._colorValue.G = targetValue;
+                normalizedValue = this._colorValue.G;
                 break;
             case "blue":
                 this._colorValue.B = targetValue;
+                normalizedValue = this._colorValue.B;
                 break;
             case "hue":
                 this._colorValue.H = targetValue;
+                normalizedValue = this._colorValue.H;
                 break;
             case "saturation":
                 this._colorValue.S = targetValue;
+                normalizedValue = this._colorValue.S;
                 break;
             case "light":
                 this._colorValue.L = targetValue;
+                normalizedValue = this._colorValue.L;
                 break;
         }
+        target.value = String(normalizedValue);
         const color = this._colorValue.toRGBString();
         this._setValue(color);
         this._updateColorGrid();
@@ -293,6 +309,14 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
         }
     }
     _handleAlphaChange() {
+        // parse the input value if valid or fallback to default
+        this._alpha = this._alphaTemp ? parseFloat(this._alphaTemp) : 1;
+        if (Number.isNaN(this._alpha)) {
+            this._alpha = 1;
+        }
+        // reset input value so _alpha is rendered
+        this._alphaTemp = undefined;
+        // normalize range
         this._alpha = this._alpha < 0 ? 0 : this._alpha;
         this._alpha = this._alpha > 1 ? 1 : this._alpha;
         this._colorValue.Alpha = this._alpha;
@@ -365,6 +389,15 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
             && this._colorValue.G === value.g
             && this._colorValue.B === value.b;
     }
+    get colorPickerLabel() {
+        const effectiveLabel = getEffectiveAriaLabelText(this);
+        return effectiveLabel
+            ? `${ColorPicker_1.i18nBundle.getText(COLORPICKER_LABEL)} ${effectiveLabel}`
+            : ColorPicker_1.i18nBundle.getText(COLORPICKER_LABEL);
+    }
+    get sliderGroupLabel() {
+        return ColorPicker_1.i18nBundle.getText(COLORPICKER_SLIDER_GROUP);
+    }
     get hueSliderLabel() {
         return ColorPicker_1.i18nBundle.getText(COLORPICKER_HUE_SLIDER);
     }
@@ -394,6 +427,26 @@ let ColorPicker = ColorPicker_1 = class ColorPicker extends UI5Element {
     }
     get alphaInputLabel() {
         return ColorPicker_1.i18nBundle.getText(COLORPICKER_ALPHA);
+    }
+    get percentageLabel() {
+        return ColorPicker_1.i18nBundle.getText(COLORPICKER_PERCENTAGE);
+    }
+    get colorFieldsAnnouncementText() {
+        const mode = this._displayHSL ? "HSL" : "RGB";
+        let text = "";
+        if (mode === "RGB") {
+            text = `${this.redInputLabel} ${this._colorValue.R}, `
+                + `${this.greenInputLabel} ${this._colorValue.G}, `
+                + `${this.blueInputLabel} ${this._colorValue.B}, `
+                + `${this.alphaInputLabel} ${this._colorValue.Alpha}`;
+        }
+        else {
+            text = `${this.hueInputLabel} ${this._colorValue.H}, `
+                + `${this.saturationInputLabel} ${this._colorValue.S} ${this.percentageLabel}, `
+                + `${this.lightInputLabel} ${this._colorValue.L} ${this.percentageLabel}, `
+                + `${this.alphaInputLabel} ${this._colorValue.Alpha}`;
+        }
+        return ColorPicker_1.i18nBundle.getText(COLORPICKER_COLOR_MODE_CHANGED, mode, text);
     }
     get toggleModeTooltip() {
         return ColorPicker_1.i18nBundle.getText(COLORPICKER_TOGGLE_MODE_TOOLTIP);
@@ -468,6 +521,12 @@ __decorate([
     property({ type: Boolean })
 ], ColorPicker.prototype, "simplified", void 0);
 __decorate([
+    property()
+], ColorPicker.prototype, "accessibleName", void 0);
+__decorate([
+    property()
+], ColorPicker.prototype, "accessibleNameRef", void 0);
+__decorate([
     property({ type: Object })
 ], ColorPicker.prototype, "_mainValue", void 0);
 __decorate([
@@ -479,6 +538,9 @@ __decorate([
 __decorate([
     property({ type: Number })
 ], ColorPicker.prototype, "_alpha", void 0);
+__decorate([
+    property()
+], ColorPicker.prototype, "_alphaTemp", void 0);
 __decorate([
     property({ type: Number })
 ], ColorPicker.prototype, "_hue", void 0);

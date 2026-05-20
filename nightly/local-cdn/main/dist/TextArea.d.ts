@@ -1,10 +1,11 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
 import type { ResizeObserverCallback } from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { IFormInputElement } from "@ui5/webcomponents-base/dist/features/InputElementsFormSupport.js";
 import type Popover from "./Popover.js";
-import type PopoverHorizontalAlign from "./types/PopoverHorizontalAlign.js";
+import type InputComposition from "./features/InputComposition.js";
 type TokenizedText = Array<string>;
 type IndexedTokenizedText = Array<{
     text: string;
@@ -14,6 +15,9 @@ type ExceededText = {
     exceededText?: string;
     leftCharactersCount?: number;
     calcedMaxLength?: number;
+};
+type TextAreaInputEventDetail = {
+    escapePressed?: boolean;
 };
 /**
  * @class
@@ -36,7 +40,7 @@ type ExceededText = {
 declare class TextArea extends UI5Element implements IFormInputElement {
     eventDetails: {
         "change": void;
-        "input": void;
+        "input": TextAreaInputEventDetail;
         "select": void;
         "scroll": void;
         "value-changed": void;
@@ -155,6 +159,20 @@ declare class TextArea extends UI5Element implements IFormInputElement {
      */
     accessibleNameRef?: string;
     /**
+     * Defines the accessible description of the component.
+     * @default undefined
+     * @public
+     * @since 2.16.0
+     */
+    accessibleDescription?: string;
+    /**
+     * Receives id(or many ids) of the elements that describe the textarea.
+     * @default undefined
+     * @public
+     * @since 2.16.0
+     */
+    accessibleDescriptionRef?: string;
+    /**
      * @private
      */
     focused: boolean;
@@ -175,6 +193,12 @@ declare class TextArea extends UI5Element implements IFormInputElement {
      */
     _width?: number;
     /**
+     * Indicates whether IME composition is currently active
+     * @default false
+     * @private
+     */
+    _isComposing: boolean;
+    /**
      * Defines the value state message that will be displayed as pop up under the component.
      * The value state message slot should contain only one root element.
      *
@@ -185,7 +209,7 @@ declare class TextArea extends UI5Element implements IFormInputElement {
      * @since 1.0.0-rc.7
      * @public
      */
-    valueStateMessage: Array<HTMLElement>;
+    valueStateMessage: Slot<HTMLElement>;
     _fnOnResize: ResizeObserverCallback;
     _firstRendering: boolean;
     _openValueStateMsgPopover: boolean;
@@ -193,8 +217,10 @@ declare class TextArea extends UI5Element implements IFormInputElement {
     _keyDown?: boolean;
     previousValue: string;
     valueStatePopover?: Popover;
+    _composition?: InputComposition;
     static i18nBundle: I18nBundle;
-    get formValidityMessage(): string;
+    static composition: typeof InputComposition;
+    get formValidityMessage(): string | undefined;
     get formValidity(): ValidityStateFlags;
     formElementAnchor(): Promise<HTMLElement | undefined>;
     get formFormattedValue(): FormData | string | null;
@@ -231,10 +257,10 @@ declare class TextArea extends UI5Element implements IFormInputElement {
         leftCharactersCount: number | undefined;
         calcedMaxLength: number | undefined;
     };
+    _enableComposition(): void;
     get classes(): {
         root: {
             "ui5-textarea-root": boolean;
-            "ui5-content-custom-scrollbars": boolean;
         };
         valueStateMsg: {
             "ui5-valuestatemessage-header": boolean;
@@ -245,6 +271,8 @@ declare class TextArea extends UI5Element implements IFormInputElement {
     };
     get tabIndex(): 0 | -1;
     get ariaLabelText(): string | undefined;
+    get ariaDescriptionText(): string | undefined;
+    get ariaDescriptionTextId(): "" | "accessibleDescription";
     get ariaDescribedBy(): string | undefined;
     get ariaValueStateHiddenText(): string | undefined;
     get valueStateDefaultText(): string;
@@ -253,7 +281,6 @@ declare class TextArea extends UI5Element implements IFormInputElement {
     get displayValueStateMessagePopover(): boolean;
     get hasCustomValueState(): boolean;
     get hasValueState(): boolean;
-    get _valueStatePopoverHorizontalAlign(): `${PopoverHorizontalAlign}`;
     get valueStateTextMappings(): {
         Positive: string;
         Information: string;
@@ -268,3 +295,5 @@ declare class TextArea extends UI5Element implements IFormInputElement {
     };
 }
 export default TextArea;
+export { TextArea as BaseTextArea };
+export type { TextAreaInputEventDetail };

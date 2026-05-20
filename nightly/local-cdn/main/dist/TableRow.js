@@ -4,14 +4,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-import { customElement, slot, property } from "@ui5/webcomponents-base/dist/decorators.js";
+import { customElement, slotStrict as slot, property } from "@ui5/webcomponents-base/dist/decorators.js";
 import { isEnter } from "@ui5/webcomponents-base/dist/Keys.js";
-import { toggleAttribute } from "./TableUtils.js";
 import getActiveElement from "@ui5/webcomponents-base/dist/util/getActiveElement.js";
+import query from "@ui5/webcomponents-base/dist/decorators/query.js";
+import { toggleAttribute } from "./TableUtils.js";
 import TableRowTemplate from "./TableRowTemplate.js";
 import TableRowBase from "./TableRowBase.js";
 import TableRowCss from "./generated/themes/TableRow.css.js";
-import "@ui5/webcomponents-icons/dist/overflow.js";
+import { TABLE_ROW_MULTIPLE_ACTIONS, TABLE_ROW_SINGLE_ACTION, } from "./generated/i18n/i18n-defaults.js";
 /**
  * @class
  *
@@ -27,7 +28,6 @@ import "@ui5/webcomponents-icons/dist/overflow.js";
  * @extends TableRowBase
  * @since 2.0.0
  * @public
- * @experimental This web component is available since 2.0 with an experimental flag and its API and behavior are subject to change.
  */
 let TableRow = class TableRow extends TableRowBase {
     constructor() {
@@ -57,15 +57,22 @@ let TableRow = class TableRow extends TableRowBase {
     }
     onBeforeRendering() {
         super.onBeforeRendering();
-        toggleAttribute(this, "_interactive", this._isInteractive);
-        toggleAttribute(this, "aria-rowindex", this.position !== undefined, `${this.position + 1}`);
-        toggleAttribute(this, "aria-current", this._renderNavigated && this.navigated, "true");
+        this.ariaRowIndex = (this.role === "row") ? `${this._rowIndex + 2}` : null;
         toggleAttribute(this, "draggable", this.movable, "true");
+        toggleAttribute(this, "_interactive", this._isInteractive);
+        toggleAttribute(this, "_alternate", this._alternate);
     }
-    async focus(focusOptions) {
-        this.setAttribute("tabindex", "-1");
-        HTMLElement.prototype.focus.call(this, focusOptions);
-        return Promise.resolve();
+    async _onpointerdown(e) {
+        if (e.button !== 0 || !this._isInteractive) {
+            return;
+        }
+        const composedPath = e.composedPath();
+        composedPath.splice(composedPath.indexOf(this));
+        await new Promise(resolve => setTimeout(resolve)); // wait for the focus to be set
+        const activeElement = getActiveElement();
+        if (!composedPath.includes(activeElement)) {
+            this._setActive("pointerup");
+        }
     }
     _onkeydown(e, eventOrigin) {
         super._onkeydown(e, eventOrigin);
@@ -73,35 +80,55 @@ let TableRow = class TableRow extends TableRowBase {
             return;
         }
         if (eventOrigin === this && this._isInteractive && isEnter(e)) {
-            this.toggleAttribute("_active", true);
-            this._table?._onRowClick(this);
+            this._setActive("keyup");
+            this._onclick();
         }
     }
     _onclick() {
-        if (this._isInteractive && this === getActiveElement()) {
-            this._table?._onRowClick(this);
+        if (this === getActiveElement()) {
+            if (this._isSelectable && !this._hasSelector) {
+                this._onSelectionChange();
+            }
+            else if (this.interactive || this._isNavigable) {
+                this._table?._onRowClick(this);
+            }
         }
     }
-    _onkeyup() {
-        this.removeAttribute("_active");
-    }
-    _onfocusout() {
-        this.removeAttribute("_active");
+    _setActive(deactivationEvent) {
+        this.toggleAttribute("_active", true);
+        document.addEventListener(deactivationEvent, () => {
+            this.removeAttribute("_active");
+        }, { once: true });
     }
     _onOverflowButtonClick(e) {
         const ctor = this.actions[0].constructor;
         ctor.showMenu(this._overflowActions, e.target);
+        e.stopPropagation();
     }
     get _isInteractive() {
-        return this.interactive;
+        return this.interactive || (this._isSelectable && !this._hasSelector) || this._isNavigable;
+    }
+    get _isNavigable() {
+        return this._fixedActions.find(action => {
+            return action.hasAttribute("ui5-table-row-action-navigation") && !action.invisible && !action._isInteractive;
+        }) !== undefined;
+    }
+    get _rowIndex() {
+        if (this.position !== undefined) {
+            return this.position;
+        }
+        if (this._table) {
+            return this._table.rows.indexOf(this);
+        }
+        return -1;
     }
     get _hasOverflowActions() {
-        let renderedActionsCount = 0;
+        let renderableActionsCount = 0;
         return this.actions.some(action => {
             if (action.isFixedAction() || !action.invisible) {
-                renderedActionsCount++;
+                renderableActionsCount++;
             }
-            return renderedActionsCount > this._rowActionCount;
+            return renderableActionsCount > this._rowActionCount;
         });
     }
     get _flexibleActions() {
@@ -139,6 +166,21 @@ let TableRow = class TableRow extends TableRowBase {
         });
         return overflowActions;
     }
+    get _availableActionsCount() {
+        if (this._rowActionCount < 1) {
+            return 0;
+        }
+        return [...this._flexibleActions, ...this._fixedActions].filter(action => {
+            return !action.invisible && action._isInteractive;
+        }).length + (this._hasOverflowActions ? 1 : 0);
+    }
+    get _actionCellAccText() {
+        const availableActionsCount = this._availableActionsCount;
+        if (availableActionsCount > 0) {
+            const bundleKey = availableActionsCount === 1 ? TABLE_ROW_SINGLE_ACTION : TABLE_ROW_MULTIPLE_ACTIONS;
+            return TableRowBase.i18nBundle.getText(bundleKey, availableActionsCount);
+        }
+    }
 };
 __decorate([
     slot({
@@ -146,7 +188,7 @@ __decorate([
         "default": true,
         individualSlots: true,
         invalidateOnChildChange: {
-            properties: ["_popin", "_popinHidden"],
+            properties: ["merged", "_popin", "_popinHidden"],
             slots: false,
         },
     })
@@ -172,6 +214,12 @@ __decorate([
 __decorate([
     property({ type: Boolean })
 ], TableRow.prototype, "movable", void 0);
+__decorate([
+    query("#popin-cell")
+], TableRow.prototype, "_popinCell", void 0);
+__decorate([
+    query("#actions-cell")
+], TableRow.prototype, "_actionsCell", void 0);
 TableRow = __decorate([
     customElement({
         tag: "ui5-table-row",

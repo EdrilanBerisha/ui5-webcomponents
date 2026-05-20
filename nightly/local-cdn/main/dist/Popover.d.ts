@@ -1,8 +1,11 @@
+import type { Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import Popup from "./Popup.js";
 import PopoverPlacement from "./types/PopoverPlacement.js";
 import PopoverVerticalAlign from "./types/PopoverVerticalAlign.js";
 import PopoverHorizontalAlign from "./types/PopoverHorizontalAlign.js";
+import PopoverResize from "./PopoverResize.js";
+import type { ResizeHandlePlacement } from "./PopoverResize.js";
 type PopoverSize = {
     width: number;
     height: number;
@@ -11,11 +14,23 @@ type ArrowPosition = {
     x: number;
     y: number;
 };
+declare enum PopoverActualHorizontalAlign {
+    Center = "Center",
+    Left = "Left",
+    Right = "Right",
+    Stretch = "Stretch"
+}
+declare enum PopoverActualPlacement {
+    Left = "Left",
+    Right = "Right",
+    Top = "Top",
+    Bottom = "Bottom"
+}
 type CalculatedPlacement = {
     arrow: ArrowPosition;
     top: number;
     left: number;
-    placement: `${PopoverPlacement}`;
+    actualPlacement: `${PopoverActualPlacement}`;
 };
 /**
  * @class
@@ -82,7 +97,7 @@ declare class Popover extends Popup {
     verticalAlign: `${PopoverVerticalAlign}`;
     /**
      * Defines whether the component should close when
-     * clicking/tapping outside of the popover.
+     * clicking/tapping outside the popover.
      * If enabled, it blocks any interaction with the background.
      * @default false
      * @public
@@ -103,6 +118,14 @@ declare class Popover extends Popup {
      */
     allowTargetOverlap: boolean;
     /**
+     * Determines whether the component is resizable.
+     * **Note:** This property is effective only on desktop devices.
+     * @default false
+     * @public
+     * @since 2.19.0
+     */
+    resizable: boolean;
+    /**
      * Sets the X translation of the arrow
      * @private
      */
@@ -116,20 +139,21 @@ declare class Popover extends Popup {
      * Returns the calculated placement depending on the free space
      * @private
      */
-    actualPlacement: `${PopoverPlacement}`;
+    actualPlacement: `${PopoverActualPlacement}`;
     _maxHeight?: number;
     _maxWidth?: number;
+    _resizeHandlePlacement?: `${ResizeHandlePlacement}`;
     /**
      * Defines the header HTML Element.
      * @public
      */
-    header: Array<HTMLElement>;
+    header: Slot<HTMLElement>;
     /**
      * Defines the footer HTML Element.
      * @public
      */
-    footer: Array<HTMLElement>;
-    _opener?: HTMLElement | string;
+    footer: Slot<HTMLElement>;
+    _opener?: HTMLElement | string | null | undefined;
     _openerRect?: DOMRect;
     _preventRepositionAndClose?: boolean;
     _top?: number;
@@ -137,6 +161,10 @@ declare class Popover extends Popup {
     _oldPlacement?: CalculatedPlacement;
     _width?: string;
     _height?: string;
+    _openerIntersectionObserver?: IntersectionObserver | null;
+    _popoverResize: PopoverResize;
+    _initialWidth?: string;
+    _initialHeight?: string;
     static get VIEWPORT_MARGIN(): number;
     constructor();
     /**
@@ -147,10 +175,12 @@ declare class Popover extends Popup {
      * @default undefined
      * @since 1.2.0
      */
-    set opener(value: HTMLElement | string);
-    get opener(): HTMLElement | string | undefined;
+    set opener(value: HTMLElement | string | null);
+    get opener(): HTMLElement | string | null | undefined;
     openPopup(): Promise<void>;
+    closePopup(escPressed?: boolean, preventRegistryUpdate?: boolean, preventFocusRestore?: boolean): void;
     isOpenerClicked(e: MouseEvent): boolean;
+    isClicked(e: MouseEvent): boolean;
     /**
      * Override for the _addOpenedPopup hook, which would otherwise just call addOpenedPopup(this)
      * @private
@@ -161,14 +191,15 @@ declare class Popover extends Popup {
      * @private
      */
     _removeOpenedPopup(): void;
-    getOpenerHTMLElement(opener: HTMLElement | string | undefined): HTMLElement | null | undefined;
-    shouldCloseDueToOverflow(placement: `${PopoverPlacement}`, openerRect: DOMRect): boolean;
+    getOpenerHTMLElement(opener: HTMLElement | string | null | undefined): HTMLElement | null | undefined;
+    shouldCloseDueToOverflow(placement: `${PopoverActualPlacement}`, openerRect: DOMRect): boolean;
     shouldCloseDueToNoOpener(openerRect: DOMRect): boolean;
     isOpenerOutsideViewport(openerRect: DOMRect): boolean;
     /**
      * @override
      */
     _resize(): void;
+    get _viewportMargin(): number;
     reposition(): void;
     _show(): Promise<void>;
     /**
@@ -179,7 +210,23 @@ declare class Popover extends Popup {
      * @returns The adjusted top in px.
      */
     _adjustForIOSKeyboard(top: number): number;
-    getPopoverSize(): PopoverSize;
+    /**
+     * Callback invoked when the opener element's intersection status changes.
+     * Closes the popover when the opener is no longer visible.
+     * @private
+     */
+    _onOpenerIntersection(entries: Array<IntersectionObserverEntry>): void;
+    /**
+     * Starts observing the opener element's visibility in the viewport.
+     * @private
+     */
+    _observeOpenerVisibility(): void;
+    /**
+     * Stops observing the opener element and cleans up the IntersectionObserver instance.
+     * @private
+     */
+    _unobserveOpenerVisibility(): void;
+    getPopoverSize(calcScrollHeight?: boolean): PopoverSize;
     _showOutsideViewport(): void;
     _isUI5AbstractElement(el: HTMLElement): el is UI5Element;
     get arrowDOM(): Element;
@@ -191,6 +238,7 @@ declare class Popover extends Popup {
      * @private
      */
     calcPlacement(targetRect: DOMRect, popoverSize: PopoverSize): CalculatedPlacement;
+    get isVertical(): boolean;
     getRTLCorrectionLeft(): number;
     /**
      * Calculates the position for the arrow.
@@ -208,8 +256,8 @@ declare class Popover extends Popup {
      * Fallbacks to new placement, prioritizing `Left` and `Right` placements.
      * @private
      */
-    fallbackPlacement(clientWidth: number, clientHeight: number, targetRect: DOMRect, popoverSize: PopoverSize): PopoverPlacement | undefined;
-    getActualPlacement(targetRect: DOMRect, popoverSize: PopoverSize): `${PopoverPlacement}`;
+    fallbackPlacement(clientWidth: number, clientHeight: number, targetRect: DOMRect, popoverSize: PopoverSize): PopoverActualPlacement | undefined;
+    getActualPlacement(targetRect: DOMRect): `${PopoverActualPlacement}`;
     getVerticalLeft(targetRect: DOMRect, popoverSize: PopoverSize): number;
     getHorizontalTop(targetRect: DOMRect, popoverSize: PopoverSize): number;
     get isModal(): boolean;
@@ -233,8 +281,13 @@ declare class Popover extends Popup {
      * Hook for descendants to hide footer.
      */
     get _displayFooter(): boolean;
-    get _actualHorizontalAlign(): "Start" | "End" | "Center" | "Stretch" | PopoverHorizontalAlign.Start | PopoverHorizontalAlign.End;
+    get isRtl(): boolean;
+    get _actualHorizontalAlign(): PopoverActualHorizontalAlign;
+    get _showResizeHandle(): boolean;
+    get resizeHandlePlacement(): "TopLeft" | "TopRight" | "BottomLeft" | "BottomRight" | undefined;
+    _onResizeMouseDown(e: MouseEvent): void;
+    readonly isPopover = true;
 }
-declare const instanceOfPopover: (object: any) => object is Popover;
 export default Popover;
-export { instanceOfPopover };
+export declare const instanceOfPopover: (object: any) => object is Popover;
+export { PopoverActualPlacement, PopoverActualHorizontalAlign };

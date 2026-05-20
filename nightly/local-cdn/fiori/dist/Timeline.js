@@ -8,15 +8,15 @@ var Timeline_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import { renderFinished } from "@ui5/webcomponents-base/dist/Render.js";
-import { isTabNext, isTabPrevious, isSpace, isEnter, isUp, isDown, isLeft, isRight, } from "@ui5/webcomponents-base/dist/Keys.js";
+import { isSpace, isEnter, isUp, isDown, isLeft, isRight, isF2, } from "@ui5/webcomponents-base/dist/Keys.js";
 import "./TimelineItem.js";
 import ItemNavigation from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
 import NavigationMode from "@ui5/webcomponents-base/dist/types/NavigationMode.js";
-import { TIMELINE_ARIA_LABEL } from "./generated/i18n/i18n-defaults.js";
+import { TIMELINE_ARIA_LABEL, TIMELINE_LOAD_MORE_BUTTON_TEXT } from "./generated/i18n/i18n-defaults.js";
 import TimelineTemplate from "./TimelineTemplate.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import debounce from "@ui5/webcomponents-base/dist/util/debounce.js";
@@ -28,6 +28,8 @@ import TimelineCss from "./generated/themes/Timeline.css.js";
 import TimelineLayout from "./types/TimelineLayout.js";
 // Mode
 import TimelineGrowingMode from "./types/TimelineGrowingMode.js";
+import { getFirstFocusableElement } from "@ui5/webcomponents-base/dist/util/FocusableElements.js";
+import getActiveElement from "@ui5/webcomponents-base/dist/util/getActiveElement.js";
 const SHORT_LINE_WIDTH = "ShortLineWidth";
 const LARGE_LINE_WIDTH = "LargeLineWidth";
 const GROWING_WITH_SCROLL_DEBOUNCE_RATE = 250; // ms
@@ -112,6 +114,9 @@ let Timeline = Timeline_1 = class Timeline extends UI5Element {
     get growingButtonIcon() {
         return this.layout === TimelineLayout.Horizontal ? process : drillDown;
     }
+    get growingButtonText() {
+        return Timeline_1.i18nBundle.getText(TIMELINE_LOAD_MORE_BUTTON_TEXT);
+    }
     get growsWithButton() {
         return this.growing === TimelineGrowingMode.Button;
     }
@@ -162,6 +167,9 @@ let Timeline = Timeline_1 = class Timeline extends UI5Element {
     loadMore() {
         this.fireDecoratorEvent("load-more");
     }
+    getFocusDomRef() {
+        return this._itemNavigation._getCurrentItem();
+    }
     _onLoadMoreKeydown(e) {
         if (isSpace(e)) {
             e.preventDefault();
@@ -195,6 +203,12 @@ let Timeline = Timeline_1 = class Timeline extends UI5Element {
         }
         for (let i = 0; i < this.items.length; i++) {
             this.items[i].layout = this.layout;
+            if (this.hasGroupItems) {
+                this.items[i].effectiveRole = "treeitem";
+            }
+            else {
+                this.items[i].effectiveRole = "listitem";
+            }
             if (this.items[i + 1] && !!this.items[i + 1].icon) {
                 this.items[i].forcedLineWidth = SHORT_LINE_WIDTH;
             }
@@ -225,43 +239,33 @@ let Timeline = Timeline_1 = class Timeline extends UI5Element {
             }
         }
     }
-    _onkeydown(e) {
-        const target = e.target;
-        if (isDown(e) || isRight(e)) {
+    async _onkeydown(e) {
+        const target = e.target, targetfocusDomRef = target?.getFocusDomRef(), shouldHandleCustomArrowNavigation = targetfocusDomRef === this.getFocusDomRef() || target === this.growingButton;
+        if (shouldHandleCustomArrowNavigation && (isDown(e) || isRight(e))) {
             this._handleDown();
             e.preventDefault();
             return;
         }
-        if (isUp(e) || isLeft(e)) {
+        if (shouldHandleCustomArrowNavigation && (isUp(e) || isLeft(e))) {
             this._handleUp(e);
             e.preventDefault();
             return;
         }
-        if (target.nameClickable && !target.getFocusDomRef().matches(":has(:focus-within)")) {
-            return;
-        }
-        if (isTabNext(e)) {
-            this._handleNextOrPreviousItem(e, true);
-        }
-        else if (isTabPrevious(e)) {
-            this._handleNextOrPreviousItem(e);
-        }
-    }
-    _handleNextOrPreviousItem(e, isNext) {
-        const target = e.target;
-        let updatedTarget = target;
-        if (target.isGroupItem) {
-            updatedTarget = target.shadowRoot.querySelector("[ui5-toggle-button]");
-        }
-        const nextTargetIndex = isNext ? this._navigableItems.indexOf(updatedTarget) + 1 : this._navigableItems.indexOf(updatedTarget) - 1;
-        const nextTarget = this._navigableItems[nextTargetIndex];
-        if (!nextTarget) {
-            return;
-        }
-        if (nextTarget) {
-            e.preventDefault();
-            nextTarget.focus();
-            this._itemNavigation.setCurrentItem(nextTarget);
+        if (isF2(e)) {
+            e.stopImmediatePropagation();
+            const activeElement = getActiveElement();
+            const focusDomRef = this.getFocusDomRef();
+            if (!focusDomRef) {
+                return;
+            }
+            if (activeElement === focusDomRef) {
+                const firstFocusable = await getFirstFocusableElement(focusDomRef);
+                firstFocusable?.focus();
+            }
+            else {
+                const parentItem = e.target?.closest("ui5-timeline-item");
+                parentItem?.focus();
+            }
         }
     }
     _handleDown() {
@@ -294,6 +298,9 @@ let Timeline = Timeline_1 = class Timeline extends UI5Element {
     focusItem(item) {
         this._itemNavigation.setCurrentItem(item);
         item.focus();
+    }
+    get hasGroupItems() {
+        return this.items.some(item => item.isGroupItem);
     }
     get _navigableItems() {
         const navigatableItems = [];

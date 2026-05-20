@@ -1,9 +1,11 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { I18nText } from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { ITimelineItem } from "./Timeline.js";
 import type ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
 import type TimelineLayout from "./types/TimelineLayout.js";
+type TimelineItemRole = "listitem" | "treeitem";
 /**
  * @class
  *
@@ -28,6 +30,13 @@ declare class TimelineItem extends UI5Element implements ITimelineItem {
      * @public
      */
     icon?: string;
+    /**
+     * Defines the tooltip of the graphical icon.
+     * @default undefined
+     * @public
+     * @since 2.22.0
+     */
+    iconTooltip?: string;
     /**
      * Defines the name of the item, displayed before the `title-text`.
      * @default undefined
@@ -63,7 +72,7 @@ declare class TimelineItem extends UI5Element implements ITimelineItem {
      * Defines the content of the `ui5-timeline-item`.
      * @public
      */
-    content: Array<Node>;
+    content: DefaultSlot<Node>;
     /**
      * @private
      */
@@ -98,11 +107,15 @@ declare class TimelineItem extends UI5Element implements ITimelineItem {
      */
     hidden: boolean;
     /**
+     * @private
+     */
+    effectiveRole: `${TimelineItemRole}`;
+    /**
      * Defines the position of the item in a group.
      * @private
      */
     positionInGroup?: number;
-    static i18nBundle: I18nBundle;
+    static i18nBundleFiori: I18nBundle;
     constructor();
     onNamePress(): void;
     /**
@@ -112,5 +125,6 @@ declare class TimelineItem extends UI5Element implements ITimelineItem {
     static typeTextMappings(): Record<string, I18nText>;
     get timelineItemStateText(): string | undefined;
     get isGroupItem(): boolean;
+    get _getAccessibleLabel(): string;
 }
 export default TimelineItem;

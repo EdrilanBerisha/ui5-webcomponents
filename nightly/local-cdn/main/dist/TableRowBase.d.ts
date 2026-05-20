@@ -11,18 +11,23 @@ import type Table from "./Table.js";
  * @since 2.0.0
  * @public
  */
-declare abstract class TableRowBase extends UI5Element {
-    cells: Array<TableCellBase>;
+declare abstract class TableRowBase<TCell extends TableCellBase = TableCellBase> extends UI5Element {
+    cells: Array<TCell>;
     _invalidate: number;
     _rowActionCount: number;
     _renderNavigated: boolean;
+    _alternate: boolean;
+    _renderDummyCell: boolean;
     _selectionCell?: HTMLElement;
     _navigatedCell?: HTMLElement;
     static i18nBundle: I18nBundle;
+    isHeaderRow(): boolean;
     onEnterDOM(): void;
     onBeforeRendering(): void;
+    onAfterRendering(): void;
     getFocusDomRef(): this;
-    isHeaderRow(): boolean;
+    focus(focusOptions?: FocusOptions | undefined): Promise<void>;
+    _handleCustomFocusOutline(): void;
     _onSelectionChange(): void;
     _onkeydown(e: KeyboardEvent, eventOrigin: HTMLElement): void;
     get _table(): Table | undefined;
@@ -31,9 +36,11 @@ declare abstract class TableRowBase extends UI5Element {
     get _isSelected(): boolean | undefined;
     get _isSelectable(): boolean | undefined;
     get _isMultiSelect(): boolean;
-    get _hasRowSelector(): boolean;
-    get _visibleCells(): TableCellBase[];
-    get _popinCells(): TableCellBase[];
+    get _hasSelector(): boolean | undefined;
+    get _visibleCells(): TCell[];
+    get _firstVisibleCell(): TCell | undefined;
+    get _popinCells(): TCell[];
+    get _hasPopin(): boolean;
     get _stickyCells(): (HTMLElement | undefined)[];
     get _i18nRowSelector(): string;
 }

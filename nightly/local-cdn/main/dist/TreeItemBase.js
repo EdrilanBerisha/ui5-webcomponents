@@ -8,11 +8,10 @@ var TreeItemBase_1;
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import { isLeft, isRight } from "@ui5/webcomponents-base/dist/Keys.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { getScopedVarName } from "@ui5/webcomponents-base/dist/CustomElementsScope.js";
 import ListItem from "./ListItem.js";
 import "@ui5/webcomponents-icons/dist/navigation-right-arrow.js";
 import "@ui5/webcomponents-icons/dist/navigation-down-arrow.js";
@@ -93,9 +92,14 @@ let TreeItemBase = TreeItemBase_1 = class TreeItemBase extends ListItem {
          * @since 1.10.0
          */
         this._fixed = false;
+        /**
+         * @private
+         */
+        this._hasImage = false;
     }
     onBeforeRendering() {
         this.showToggleButton = this.requiresToggleButton;
+        this._hasImage = this.hasImage;
     }
     get classes() {
         const allClasses = super.classes;
@@ -105,7 +109,7 @@ let TreeItemBase = TreeItemBase_1 = class TreeItemBase extends ListItem {
     get styles() {
         return {
             preContent: {
-                "padding-inline-start": `calc(var(${getScopedVarName("--_ui5-tree-indent-step")}) * ${this.effectiveLevel})`,
+                "padding-inline-start": `calc(var(--_ui5-tree-indent-step) * ${this.effectiveLevel})`,
             },
         };
     }
@@ -117,6 +121,9 @@ let TreeItemBase = TreeItemBase_1 = class TreeItemBase extends ListItem {
     }
     get hasParent() {
         return this.level > 1;
+    }
+    get hasImage() {
+        return !!this.image.length;
     }
     get _toggleIconName() {
         return this.expanded ? "navigation-down-arrow" : "navigation-right-arrow";
@@ -157,8 +164,8 @@ let TreeItemBase = TreeItemBase_1 = class TreeItemBase extends ListItem {
         e.stopPropagation();
         this.fireDecoratorEvent("toggle", { item: this });
     }
-    async _onkeydown(e) {
-        await super._onkeydown(e);
+    _onkeydown(e) {
+        super._onkeydown(e);
         if (!this._fixed && this.showToggleButton && isRight(e)) {
             if (!this.expanded) {
                 this.fireDecoratorEvent("toggle", { item: this });
@@ -217,6 +224,9 @@ __decorate([
     property({ type: Boolean })
 ], TreeItemBase.prototype, "_fixed", void 0);
 __decorate([
+    property({ type: Boolean })
+], TreeItemBase.prototype, "_hasImage", void 0);
+__decorate([
     slot({
         type: HTMLElement,
         invalidateOnChildChange: {
@@ -226,6 +236,9 @@ __decorate([
         "default": true,
     })
 ], TreeItemBase.prototype, "items", void 0);
+__decorate([
+    slot()
+], TreeItemBase.prototype, "image", void 0);
 __decorate([
     i18n("@ui5/webcomponents")
 ], TreeItemBase, "i18nBundle", void 0);

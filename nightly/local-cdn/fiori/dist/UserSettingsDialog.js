@@ -6,7 +6,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 var UserSettingsDialog_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
-import { customElement, property, slot, eventStrict as event, } from "@ui5/webcomponents-base/dist/decorators.js";
+import { customElement, property, slotStrict as slot, eventStrict as event, } from "@ui5/webcomponents-base/dist/decorators.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import { isPhone, isTablet, isCombi } from "@ui5/webcomponents-base/dist/Device.js";
@@ -27,7 +27,6 @@ import { USER_SETTINGS_DIALOG_ACCESSIBLE_NAME, USER_SETTINGS_LIST_ARIA_ROLE_DESC
  *
  * @constructor
  * @extends UI5Element
- * @experimental
  * @public
  * @since 2.8.0
  */
@@ -70,11 +69,15 @@ let UserSettingsDialog = UserSettingsDialog_1 = class UserSettingsDialog extends
          */
         this._showNoSearchResult = false;
     }
+    onEnterDOM() {
+        this.setAttribute("data-sap-ui-fastnavgroup-container", "true");
+    }
     onBeforeRendering() {
         this._mediaRange = MediaRange.getCurrentRange(MediaRange.RANGESETS.RANGE_4STEPS);
         const searchValue = this._searchValue.toLowerCase();
         this._filteredItems = [];
         this._filteredFixedItems = [];
+        const siblingsWithIcon = this.items.some(item => !!item.icon);
         this.items.forEach(item => {
             if (item.text.toLowerCase().includes(searchValue)) {
                 this._filteredItems.push(item);
@@ -82,6 +85,7 @@ let UserSettingsDialog = UserSettingsDialog_1 = class UserSettingsDialog extends
             if (item.selected) {
                 this._selectedSetting = item;
             }
+            item._siblingsWithIcon = siblingsWithIcon;
         });
         this.fixedItems.forEach(item => {
             if (item.text.toLowerCase().includes(searchValue)) {
@@ -100,6 +104,15 @@ let UserSettingsDialog = UserSettingsDialog_1 = class UserSettingsDialog extends
         if (!this._selectedSetting) {
             this._selectedSetting = this.items[0] || this.fixedItems[0];
         }
+        const allItems = [...this.items, ...this.fixedItems];
+        allItems.forEach(item => {
+            if (item === this._selectedSetting) {
+                item.setAttribute("data-sap-ui-fastnavgroup", "true");
+            }
+            else {
+                item.removeAttribute("data-sap-ui-fastnavgroup");
+            }
+        });
     }
     _handleItemClick(e) {
         const setting = e.detail.item;

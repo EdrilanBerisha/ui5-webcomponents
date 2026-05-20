@@ -1,4 +1,5 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot, Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type { TabContainerTabSelectEventDetail } from "@ui5/webcomponents/dist/TabContainer.js";
 import type UserSettingsView from "./UserSettingsView.js";
 type UserSettingsItemViewSelectEventDetail = {
@@ -23,7 +24,6 @@ type UserSettingsItemBackClickEventDetail = {
  *
  * @constructor
  * @extends UI5Element
- * @experimental
  * @public
  * @since 2.8.0
  */
@@ -96,21 +96,26 @@ declare class UserSettingsItem extends UI5Element {
      */
     accessibleName?: string;
     /**
-     * Defines the tab views of the user settings item.
-     *
-     * The tab views are displayed by default if there is no selected page view.
-     * @public
-     */
-    tabs: Array<UserSettingsView>;
-    /**
      * Defines the page views of the user settings item.
      *
      * If there are no tab views, the first page view will be shown unless there is selected one. If there is selected page
      * view it will be shown no matter if there are tab views.
      *
+     * The page views are displayed by default if there is no selected tab view.
+     *
      * @public
      */
-    pages: Array<UserSettingsView>;
+    pages: DefaultSlot<UserSettingsView>;
+    /**
+     * Defines the tab views of the user settings item.
+     *
+     * @public
+     */
+    tabs: Slot<UserSettingsView>;
+    /**
+     * Indicates whether any of the element siblings have icon.
+     */
+    _siblingsWithIcon: boolean;
     /**
      * @private
      */

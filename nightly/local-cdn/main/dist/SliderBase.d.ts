@@ -96,13 +96,13 @@ declare abstract class SliderBase extends UI5Element {
     /**
      * @private
      */
-    _tooltipVisibility: string;
+    _tooltipsOpen: boolean;
     _labelsOverlapping: boolean;
     _hiddenTickmarks: boolean;
-    _isInputValueValid: boolean;
     _resizeHandler: ResizeObserverCallback;
     _moveHandler: (e: TouchEvent | MouseEvent) => void;
     _upHandler: (e: TouchEvent | MouseEvent) => void;
+    _windowMouseoutHandler: (e: MouseEvent) => void;
     _stateStorage: StateStorage;
     notResized: boolean;
     _isUserInteraction: boolean;
@@ -119,11 +119,6 @@ declare abstract class SliderBase extends UI5Element {
     _handleUp(e: TouchEvent | MouseEvent): void;
     _onmousedown(e: TouchEvent | MouseEvent): void;
     _handleActionKeyPress(e: Event): void;
-    _updateInputValue(): void;
-    abstract styles: {
-        label: Record<string, string>;
-        labelContainer: Record<string, string>;
-    };
     abstract tickmarksObject: Array<boolean>;
     abstract _ariaLabelledByText: string;
     static get ACTION_KEYS(): ((event: KeyboardEvent) => boolean)[];
@@ -155,10 +150,6 @@ declare abstract class SliderBase extends UI5Element {
      */
     _onmouseout(): void;
     _onkeydown(e: KeyboardEvent): void;
-    _onInputKeydown(e: KeyboardEvent): void;
-    _onInputChange(): void;
-    _onInputInput(): void;
-    _updateValueFromInput(e: Event): void;
     _onKeyupBase(): void;
     /**
      * Flags if an inner element is currently being focused
@@ -310,7 +301,7 @@ declare abstract class SliderBase extends UI5Element {
     get _effectiveMax(): number;
     get _tabIndex(): 0 | -1;
     get _ariaDescribedByHandleText(): "ui5-slider-InputDesc" | undefined;
-    get _ariaLabelledByHandleText(): "ui5-slider-accName ui5-slider-sliderDesc" | "ui5-slider-sliderDesc";
+    get _ariaLabel(): string;
     get _ariaDescribedByInputText(): string;
     get _ariaLabelledByInputText(): string;
 }

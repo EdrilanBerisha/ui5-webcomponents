@@ -7,8 +7,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var Tab_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
+import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import executeTemplate from "@ui5/webcomponents-base/dist/renderer/executeTemplate.js";
 import willShowContent from "@ui5/webcomponents-base/dist/util/willShowContent.js";
@@ -30,6 +31,7 @@ import css from "./generated/themes/Tab.css.js";
 import stripCss from "./generated/themes/TabInStrip.css.js";
 import draggableElementStyles from "./generated/themes/DraggableElement.css.js";
 import overflowCss from "./generated/themes/TabInOverflow.css.js";
+import DragRegistry from "@ui5/webcomponents-base/dist/util/dragAndDrop/DragRegistry.js";
 const DESIGN_DESCRIPTIONS = {
     [SemanticColor.Positive]: TAB_ARIA_DESIGN_POSITIVE,
     [SemanticColor.Negative]: TAB_ARIA_DESIGN_NEGATIVE,
@@ -82,7 +84,8 @@ let Tab = Tab_1 = class Tab extends UI5Element {
          * Defines if the tab is movable.
          *
          * @default false
-         * @private
+         * @public
+         * @since 2.0.0
          */
         this.movable = false;
         this._isTopLevelTab = false;
@@ -316,11 +319,13 @@ let Tab = Tab_1 = class Tab extends UI5Element {
     }
     _ondragstart(e) {
         if (e.target instanceof HTMLElement) {
+            DragRegistry.setDraggedElement(this, e);
             e.target.setAttribute("data-moving", "");
         }
     }
     _ondragend(e) {
         if (e.target instanceof HTMLElement) {
+            DragRegistry.clearDraggedElement();
             e.target.removeAttribute("data-moving");
         }
     }
@@ -392,6 +397,18 @@ Tab = Tab_1 = __decorate([
         renderer: jsxRenderer,
         template: TabTemplate,
         styles: css,
+    })
+    /**
+     * Fired when the tab is selected either with a mouse/tap or by using the Enter or Space key.
+     *
+     * @since 2.22.0
+     * @public
+     * @param {Tab} tab The selected tab.
+     * @param {Event} originalEvent The original event from the user interaction.
+     */
+    ,
+    event("click", {
+        bubbles: true,
     })
 ], Tab);
 Tab.define();

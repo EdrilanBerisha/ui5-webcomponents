@@ -1,5 +1,5 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
-import type { ChangeInfo } from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { ChangeInfo, DefaultSlot, Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type { ResizeObserverCallback } from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
 import ItemNavigation from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
 import type { ITabbable } from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
@@ -108,6 +108,7 @@ declare enum TableFocusTargetElement {
  * @constructor
  * @extends UI5Element
  * @public
+ * @deprecated Deprecated as of version 2.12.0, use `@ui5/webcomponents/dist/Table.js` instead.
  */
 declare class Table extends UI5Element {
     eventDetails: {
@@ -252,14 +253,14 @@ declare class Table extends UI5Element {
      * **Note:** Use `ui5-table-row` for the intended design.
      * @public
      */
-    rows: Array<ITableRow>;
+    rows: DefaultSlot<ITableRow>;
     /**
      * Defines the configuration for the columns of the component.
      *
      * **Note:** Use `ui5-table-column` for the intended design.
      * @public
      */
-    columns: Array<TableColumn>;
+    columns: Slot<TableColumn>;
     static i18nBundle: I18nBundle;
     fnHandleF7: (e: CustomEvent) => void;
     fnOnRowFocused: (e: CustomEvent) => void;
@@ -311,6 +312,7 @@ declare class Table extends UI5Element {
     _getAfterForwardElement(): HTMLElement;
     _getBeforeForwardElement(): HTMLElement;
     onRowFocused(e: CustomEvent): void;
+    onRowKeyDown(e: KeyboardEvent): void;
     _onColumnHeaderFocused(): void;
     _onColumnHeaderClick(e: MouseEvent | KeyboardEvent): void;
     _onColumnHeaderKeydown(e: KeyboardEvent): void;

@@ -4,6 +4,7 @@ import type ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
 import ListItem from "./ListItem.js";
 import "@ui5/webcomponents-icons/dist/navigation-right-arrow.js";
 import "@ui5/webcomponents-icons/dist/navigation-down-arrow.js";
+import type { DefaultSlot, Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 type TreeItemBaseEventDetail = {
     item: TreeItemBase;
 };
@@ -116,12 +117,26 @@ declare class TreeItemBase extends ListItem {
      */
     _fixed: boolean;
     /**
+     * @private
+     */
+    _hasImage: boolean;
+    /**
      * Defines the items of the component.
      *
      * **Note:** Use `ui5-tree-item` or `ui5-tree-item-custom`
      * @public
      */
-    items: Array<TreeItemBase>;
+    items: DefaultSlot<TreeItemBase>;
+    /**
+     * **Note:** While the slot allows option for setting custom avatar, to match the
+     * design guidelines, please use the `ui5-avatar` with size XS.
+     *
+     * **Note:** If bigger `ui5-avatar` needs to be used, then the size of the
+     * `ui5-tree-item` should be customized in order to fit.
+     * @since 2.10.0
+     * @public
+     */
+    image: Slot<HTMLElement>;
     static i18nBundle: I18nBundle;
     onBeforeRendering(): void;
     get classes(): ClassMap;
@@ -133,6 +148,7 @@ declare class TreeItemBase extends ListItem {
     get requiresToggleButton(): boolean;
     get effectiveLevel(): number;
     get hasParent(): boolean;
+    get hasImage(): boolean;
     get _toggleIconName(): "navigation-right-arrow" | "navigation-down-arrow";
     get _ariaLabel(): string;
     get _accInfo(): {
@@ -164,7 +180,7 @@ declare class TreeItemBase extends ListItem {
      */
     toggle(): void;
     _toggleClick(e: MouseEvent | KeyboardEvent): void;
-    _onkeydown(e: KeyboardEvent): Promise<void>;
+    _onkeydown(e: KeyboardEvent): void;
     get iconAccessibleName(): string;
 }
 export default TreeItemBase;

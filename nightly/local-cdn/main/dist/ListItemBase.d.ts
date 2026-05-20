@@ -6,6 +6,10 @@ type ListItemBasePressEventDetail = {
     selected?: boolean;
     key?: string;
 };
+type ListItemBaseClickEventDetail = {
+    item: ListItemBase;
+    originalEvent: Event;
+};
 /**
  * @class
  * A class to serve as a foundation
@@ -17,6 +21,7 @@ type ListItemBasePressEventDetail = {
  */
 declare class ListItemBase extends UI5Element implements ITabbable {
     eventDetails: {
+        "click": ListItemBaseClickEventDetail;
         "request-tabindex-change": FocusEvent;
         "_press": ListItemBasePressEventDetail;
         "_focused": FocusEvent;
@@ -67,6 +72,18 @@ declare class ListItemBase extends UI5Element implements ITabbable {
     _onkeydown(e: KeyboardEvent): void;
     _onkeyup(e: KeyboardEvent): void;
     _onclick(e: MouseEvent): void;
+    _isDisabledInteractiveContentClicked(e: MouseEvent): boolean;
+    _isNativeInteractiveElement(target: HTMLElement): boolean;
+    _isCustomInteractiveElement(target: HTMLElement): boolean;
+    _isElementDisabled(target: HTMLElement): boolean;
+    /**
+     * Override from subcomponent, if needed
+     */
+    _isSpace(e: KeyboardEvent): boolean;
+    /**
+     * Override from subcomponent, if needed
+     */
+    _isEnter(e: KeyboardEvent): boolean;
     fireItemPress(e: Event): void;
     _handleTabNext(e: KeyboardEvent): void;
     _handleTabPrevious(e: KeyboardEvent): void;
@@ -85,6 +102,7 @@ declare class ListItemBase extends UI5Element implements ITabbable {
     get _pressable(): boolean;
     get hasConfigurableMode(): boolean;
     get _effectiveTabIndex(): number | undefined;
+    get isListItemBase(): boolean;
 }
 export default ListItemBase;
-export type { ListItemBasePressEventDetail, };
+export type { ListItemBasePressEventDetail, ListItemBaseClickEventDetail, };

@@ -1,18 +1,19 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type Button from "@ui5/webcomponents/dist/Button.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
-import type SearchMode from "./types/SearchMode.js";
 import type { SelectChangeEventDetail } from "@ui5/webcomponents/dist/Select.js";
 /**
  * Interface for components that may be slotted inside a `ui5-search`
  * @public
  */
-interface ISearchFieldScopeOption extends UI5Element {
+interface ISearchScope extends UI5Element {
     text?: string;
-    selected: boolean;
+    value?: string;
     stableDomRef: string;
 }
 type SearchFieldScopeSelectionChangeDetails = {
-    scope: ISearchFieldScopeOption | undefined;
+    scope: ISearchScope | undefined;
 };
 /**
  * @class
@@ -26,11 +27,10 @@ type SearchFieldScopeSelectionChangeDetails = {
  * - Input field - for user input value
  * - Clear button - gives the possibility for deleting the entered value
  * - Search button - a primary button for performing search, when the user has entered a search term
- * - Expand/Collapse button - when there is no search term, the search button behaves as an expand/collapse button for the `ui5-search-field` component
  *
  * ### ES6 Module Import
  *
- * `import "@ui5/webcomponents/fiori/dist/SearchField.js";`
+ * `import "@ui5/webcomponents-fiori/dist/SearchField.js";`
  *
  * @constructor
  * @extends UI5Element
@@ -43,11 +43,12 @@ declare class SearchField extends UI5Element {
         "scope-change": SearchFieldScopeSelectionChangeDetails;
     };
     /**
-     * Defines the mode of the component.
-     * @default "Default"
+     * Indicates whether a loading indicator should be shown in the input field.
+     * @default false
+     * @since 2.19.0
      * @public
      */
-    mode: `${SearchMode}`;
+    fieldLoading: boolean;
     /**
      * Defines whether the clear icon of the search will be shown.
      * @default false
@@ -55,19 +56,12 @@ declare class SearchField extends UI5Element {
      */
     showClearIcon: boolean;
     /**
-     * Defines whether the component is expanded.
+     * Defines whether the component is collapsed.
      *
      * @default false
-     * @public
+     * @private
      */
-    expanded: boolean;
-    /**
-     * Determines whether the component is in a fixed state that is not
-     * expandable/collapsible by user interaction.
-     * @default false
-     * @public
-     */
-    fixed: boolean;
+    collapsed: boolean;
     /**
      * Defines the value of the component.
      *
@@ -90,10 +84,37 @@ declare class SearchField extends UI5Element {
      */
     accessibleName?: string;
     /**
+     * Defines the accessible ARIA description of the field.
+     * @public
+     * @default undefined
+     */
+    accessibleDescription?: string;
+    /**
+     * Defines the value of the component:
+     *
+     * Applications are responsible for setting the correct scope value.
+     *
+     * **Note:** If the given value does not match any existing scopes,
+     * no scope will be selected and the SearchField scope component will be displayed as empty.
+     * @public
+     * @default ""
+     * @since 2.18.0
+     */
+    scopeValue?: string;
+    /**
      * Defines the component scope options.
      * @public
      */
-    scopeOptions: Array<ISearchFieldScopeOption>;
+    scopes: Slot<ISearchScope>;
+    /**
+     * Defines the filter button slot, used to display an additional filtering button.
+     * This slot is intended for passing a `ui5-button` with a filter icon to provide extended filtering options.
+     *
+     * **Note:** Scope button and Filter button are mutually exclusive.
+     * @public
+     * @since 2.11.0
+     */
+    filterButton: Slot<Button>;
     /**
      * @private
      */
@@ -107,8 +128,9 @@ declare class SearchField extends UI5Element {
     _onkeydown(e: KeyboardEvent): void;
     _onfocusin(): void;
     _onfocusout(): void;
-    _onFocusOutSearch(): void;
+    _onFocusOutSearch(e: FocusEvent): void;
     _handleEnter(): void;
+    _handleInnerClick(): void;
     _handleSearchIconPress(): void;
     _handleSearchEvent(): void;
     _handleInput(e: InputEvent): void;
@@ -120,13 +142,14 @@ declare class SearchField extends UI5Element {
     };
     get _translations(): {
         scope: string;
-        clearIcon: string;
         searchIcon: string;
-        collapsedSearch: string;
+        clearIcon: string;
+        searchFieldAriaLabel: string;
     };
+    get _effectiveIconTooltip(): string;
     captureRef(ref: HTMLElement & {
         scopeOption?: UI5Element;
     } | null): void;
 }
 export default SearchField;
-export type { ISearchFieldScopeOption, SearchFieldScopeSelectionChangeDetails };
+export type { ISearchScope, SearchFieldScopeSelectionChangeDetails };

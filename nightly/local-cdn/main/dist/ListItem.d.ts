@@ -9,6 +9,7 @@ import ListItemBase from "./ListItemBase.js";
 import type { IButton } from "./Button.js";
 import type ListItemAccessibleRole from "./types/ListItemAccessibleRole.js";
 import "@ui5/webcomponents-icons/dist/slim-arrow-right.js";
+import type { Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 interface IAccessibleListItem {
     accessibleName?: string;
     accessibleNameRef?: string;
@@ -115,14 +116,32 @@ declare abstract class ListItem extends ListItemBase {
     selected: boolean;
     /**
      * Used to define the role of the list item.
-     * @private
-     * @default "ListItem"
-     * @since 1.3.0
      *
+     * **Note:** If not set, the role is automatically inherited from the parent `ui5-list` based on its `accessible-role` property
+     * (e.g. `Menu` -> `MenuItem`, `Tree` -> `TreeItem`, `ListBox` -> `Option`).
+     * An explicitly set `accessible-role` on the list item takes precedence over the inherited role.
+     * @default undefined
+     * @public
+     * @since 1.3.0
      */
-    accessibleRole: `${ListItemAccessibleRole}`;
+    accessibleRole?: `${Exclude<ListItemAccessibleRole, ListItemAccessibleRole.Group>}`;
     _forcedAccessibleRole?: string;
+    _inheritedAccessibleRole?: string;
     _selectionMode: `${ListSelectionMode}`;
+    /**
+     * Indicates whether the list item is in edit mode.
+     * When active, Tab cycles through internal focusable elements
+     * instead of navigating to the next list item.
+     * Toggled by F2; also set by the parent List on F7.
+     * @private
+     */
+    _editMode: boolean;
+    /**
+     * Defines the current media query size.
+     * @default "S"
+     * @private
+     */
+    mediaRange: string;
     /**
      * Defines the delete button, displayed in "Delete" mode.
      * **Note:** While the slot allows custom buttons, to match
@@ -131,7 +150,7 @@ declare abstract class ListItem extends ListItemBase {
      * @since 1.9.0
      * @public
     */
-    deleteButton: Array<IButton>;
+    deleteButton: Slot<IButton>;
     deactivateByKey: (e: KeyboardEvent) => void;
     deactivate: () => void;
     accessibleName?: string;
@@ -141,7 +160,7 @@ declare abstract class ListItem extends ListItemBase {
     onBeforeRendering(): void;
     onEnterDOM(): void;
     onExitDOM(): void;
-    _onkeydown(e: KeyboardEvent): Promise<void>;
+    _onkeydown(e: KeyboardEvent): void;
     _onkeyup(e: KeyboardEvent): void;
     _onmousedown(): void;
     _onmouseup(): void;
@@ -150,7 +169,6 @@ declare abstract class ListItem extends ListItemBase {
     _onfocusout(e: FocusEvent): void;
     _ondragstart(e: DragEvent): void;
     _ondragend(e: DragEvent): void;
-    _isTargetSelfFocusDomRef(e: KeyboardEvent): boolean;
     /**
      * Called when selection components in Single (ui5-radio-button)
      * and Multi (ui5-checkbox) selection modes are used.
@@ -171,7 +189,7 @@ declare abstract class ListItem extends ListItemBase {
     get typeNavigation(): boolean;
     get typeActive(): boolean;
     get _ariaSelected(): boolean | undefined;
-    get listItemAccessibleRole(): AriaRole | undefined;
+    get listItemAccessibleRole(): import("@ui5/webcomponents-base/dist/thirdparty/preact/jsx.js").JSXInternal.AriaRole;
     get ariaSelectedText(): string | undefined;
     get deleteText(): string;
     get hasDeleteButtonSlot(): boolean;
@@ -181,6 +199,15 @@ declare abstract class ListItem extends ListItemBase {
     get _hasHighlightColor(): boolean;
     get hasConfigurableMode(): boolean;
     get _listItem(): HTMLLIElement | null;
+    _handleF2(): void;
+    _handleTabNext(e: KeyboardEvent): void;
+    _handleTabPrevious(e: KeyboardEvent): void;
+    _getFocusableElements(): HTMLElement[];
+    _indexOfActiveElement(focusables: HTMLElement[]): number;
+    _getFocusedElementIndex(): number;
+    _hasFocusableElements(): boolean;
+    _isFocusOnInternalElement(): boolean;
+    _focusInternalElement(targetIndex: number): number | undefined;
 }
 export default ListItem;
 export type { IAccessibleListItem, SelectionRequestEventDetail, ListItemAccessibilityAttributes, };

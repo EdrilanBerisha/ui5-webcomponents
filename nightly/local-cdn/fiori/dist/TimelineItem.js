@@ -9,7 +9,7 @@ import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import TimelineItemTemplate from "./TimelineItemTemplate.js";
@@ -70,6 +70,10 @@ let TimelineItem = TimelineItem_1 = class TimelineItem extends UI5Element {
          * @private
          */
         this.hidden = false;
+        /**
+         * @private
+         */
+        this.effectiveRole = "listitem";
     }
     onNamePress() {
         this.fireDecoratorEvent("name-click");
@@ -89,15 +93,37 @@ let TimelineItem = TimelineItem_1 = class TimelineItem extends UI5Element {
         };
     }
     get timelineItemStateText() {
-        return this.state !== "None" ? TimelineItem_1.i18nBundle.getText(TimelineItem_1.typeTextMappings()[this.state]) : undefined;
+        return this.state !== "None" ? TimelineItem_1.i18nBundleFiori.getText(TimelineItem_1.typeTextMappings()[this.state]) : undefined;
     }
     get isGroupItem() {
         return false;
+    }
+    get _getAccessibleLabel() {
+        const parts = [];
+        if (this.name) {
+            parts.push(this.name);
+        }
+        if (this.titleText) {
+            parts.push(this.titleText);
+        }
+        if (this.subtitleText) {
+            parts.push(this.subtitleText);
+        }
+        if (this.timelineItemStateText) {
+            parts.push(this.timelineItemStateText);
+        }
+        if (this.iconTooltip) {
+            parts.push(this.iconTooltip);
+        }
+        return parts.join(", ");
     }
 };
 __decorate([
     property()
 ], TimelineItem.prototype, "icon", void 0);
+__decorate([
+    property()
+], TimelineItem.prototype, "iconTooltip", void 0);
 __decorate([
     property()
 ], TimelineItem.prototype, "name", void 0);
@@ -141,11 +167,14 @@ __decorate([
     property({ type: Boolean })
 ], TimelineItem.prototype, "hidden", void 0);
 __decorate([
+    property({ noAttribute: true })
+], TimelineItem.prototype, "effectiveRole", void 0);
+__decorate([
     property({ type: Number })
 ], TimelineItem.prototype, "positionInGroup", void 0);
 __decorate([
-    i18n("@ui5/webcomponents")
-], TimelineItem, "i18nBundle", void 0);
+    i18n("@ui5/webcomponents-fiori")
+], TimelineItem, "i18nBundleFiori", void 0);
 TimelineItem = TimelineItem_1 = __decorate([
     customElement({
         tag: "ui5-timeline-item",

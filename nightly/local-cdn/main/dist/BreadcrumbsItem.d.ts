@@ -1,6 +1,13 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type { AccessibilityAttributes } from "@ui5/webcomponents-base/dist/types.js";
 import LinkDesign from "./types/LinkDesign.js";
+type BreadcrumbsItemClickEventDetail = {
+    altKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    shiftKey: boolean;
+};
 /**
  * @class
  *
@@ -14,6 +21,9 @@ import LinkDesign from "./types/LinkDesign.js";
  * @abstract
  */
 declare class BreadcrumbsItem extends UI5Element {
+    eventDetails: {
+        "click": BreadcrumbsItemClickEventDetail;
+    };
     /**
      * Defines the link href.
      *
@@ -50,7 +60,7 @@ declare class BreadcrumbsItem extends UI5Element {
      * **Note:** Although this slot accepts HTML Elements, it is strongly recommended that you only use text in order to preserve the intended design.
      * @public
      */
-    text: Array<Node>;
+    text: DefaultSlot<Node>;
     _accessibleNameText?: string;
     _isCurrentPageItem?: boolean;
     _needsSeparator?: boolean;
@@ -59,3 +69,4 @@ declare class BreadcrumbsItem extends UI5Element {
     get accessibilityAttributes(): Pick<AccessibilityAttributes, "current">;
 }
 export default BreadcrumbsItem;
+export type { BreadcrumbsItemClickEventDetail };

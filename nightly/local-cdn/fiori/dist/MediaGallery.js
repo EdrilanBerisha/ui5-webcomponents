@@ -16,7 +16,7 @@ import Button from "@ui5/webcomponents/dist/Button.js";
 import Carousel from "@ui5/webcomponents/dist/Carousel.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import MediaGalleryItem from "./MediaGalleryItem.js";
 import MediaGalleryItemLayout from "./types/MediaGalleryItemLayout.js";
@@ -247,6 +247,9 @@ let MediaGallery = MediaGallery_1 = class MediaGallery extends UI5Element {
             items.push(this._overflowBtn);
         }
         return items;
+    }
+    getFocusDomRef() {
+        return this._itemNavigation._getCurrentItem();
     }
     _selectItem(item, userInteraction = false) {
         if (item === this._selectedItem) {

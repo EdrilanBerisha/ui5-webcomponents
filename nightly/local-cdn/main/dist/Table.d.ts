@@ -1,7 +1,9 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import TableNavigation from "./TableNavigation.js";
 import TableOverflowMode from "./types/TableOverflowMode.js";
 import TableDragAndDrop from "./TableDragAndDrop.js";
+import TableCustomAnnouncement from "./TableCustomAnnouncement.js";
 import type DropIndicator from "./DropIndicator.js";
 import type TableHeaderRow from "./TableHeaderRow.js";
 import type TableRow from "./TableRow.js";
@@ -92,8 +94,10 @@ type TableRowActionClickEventDetail = {
  *
  * The following features are currently available:
  *
- * * [TableSelection](../TableSelection) - adds selection capabilities to the table
+ * * [TableSelectionMulti](../TableSelectionMulti) - adds multi-selection capabilities to the table
+ * * [TableSelectionSingle](../TableSelectionSingle) - adds single-selection capabilities to the table
  * * [TableGrowing](../TableGrowing) - provides growing capabilities to load more data
+ * * [TableVirtualizer](../TableVirtualizer) - adds virtualization capabilities to the table
  *
  * ### Keyboard Handling
  *
@@ -116,7 +120,6 @@ type TableRowActionClickEventDetail = {
  * * <kbd>F2</kbd> - Focuses the first tabbable element in the row
  * * <kbd>F7</kbd> - If focus position is remembered, moves focus to the corresponding focus position row, otherwise to the first tabbable element within the row
  * * <kbd>[Shift]Tab</kbd> - Move focus to the element in the tab chain outside the table
-
  *
  * If the focus is on a cell, the following keyboard shortcuts are available:
  * * <kbd>Down</kbd> - Navigates down
@@ -131,16 +134,25 @@ type TableRowActionClickEventDetail = {
  * * <kbd>Enter</kbd> - Focuses the first tabbable cell content
  * * <kbd>F7</kbd> - If the focus is on an interactive element inside a row, moves focus to the corresponding row and remembers the focus position of the element within the row
  * * <kbd>[Shift]Tab</kbd> - Move focus to the element in the tab chain outside the table
-
  *
  * If the focus is on an interactive cell content, the following keyboard shortcuts are available:
  * * <kbd>Down</kbd> - Move the focus to the interactive element in the same column of the previous row, unless the focused element prevents the default
  * * <kbd>Up</kbd> - Move the focus to the interactive element in the same column of the next row, unless the focused element prevents the default
  * * <kbd>[Shift]Tab</kbd> - Move the focus to the element in the tab chain
  *
+ * ### Accessibility
+ *
+ * The `ui5-table` follows the [ARIA grid design pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/).
+ * This pattern enables cell-based keyboard navigation and, as explained above, we also support row-based keyboard navigation.
+ * Since the grid design pattern does not inherently provide row-based keyboard behavior, if the focus is on a row, not only the row information but also the corresponding column headers for each cell must be announced.
+ * This can only be achieved through a custom accessibility announcement.
+ * To support this, UI5 Web Components expose its own accessibility metadata via the `accessibilityInfo` property.
+ * The `ui5-table` uses this information to create the required custom announcements dynamically.
+ * If you include custom web components inside table cells that are not part of the standard UI5 Web Components set, their accessibility information can be provided using the `data-ui5-acc-text` attribute.
+ *
  * ### ES6 Module Import
  *
- * `import "@ui5/webcomponents/dist/Table.js";`\
+ * `import "@ui5/webcomponents/dist/Table.js";` (`ui5-table`)\
  * `import "@ui5/webcomponents/dist/TableRow.js";` (`ui5-table-row`)\
  * `import "@ui5/webcomponents/dist/TableCell.js";` (`ui5-table-cell`)\
  * `import "@ui5/webcomponents/dist/TableHeaderRow.js";` (`ui5-table-header-row`)\
@@ -150,12 +162,6 @@ type TableRowActionClickEventDetail = {
  * @extends UI5Element
  * @since 2.0.0
  * @public
- * @experimental This Table web component is available since 2.0 and has been newly implemented to provide better screen reader and keyboard handling support.
- * Currently, it's considered experimental as its API is subject to change.
- * This Table replaces the previous Table web component, that has been part of **@ui5/webcomponents** version 1.x.
- * For compatibility reasons, we moved the previous Table implementation to the **@ui5/webcomponents-compat** package
- * and will be maintained until the new Table is experimental.
- * Keep in mind that you can use either the compat/Table, or the main/Table - you can't use them both as they both define the `ui5-table` tag name.
  */
 declare class Table extends UI5Element {
     eventDetails: {
@@ -171,7 +177,7 @@ declare class Table extends UI5Element {
      *
      * @public
      */
-    rows: Array<TableRow>;
+    rows: DefaultSlot<TableRow>;
     /**
      * Defines the header row of the component.
      *
@@ -179,19 +185,19 @@ declare class Table extends UI5Element {
      *
      * @public
      */
-    headerRow: Array<TableHeaderRow>;
+    headerRow: Slot<TableHeaderRow>;
     /**
      * Defines the custom visualization if there is no data available.
      *
      * @public
      */
-    nodata: Array<HTMLElement>;
+    noData: Slot<HTMLElement>;
     /**
      * Defines the features of the component.
      *
      * @public
      */
-    features: Array<ITableFeature>;
+    features: Slot<ITableFeature>;
     /**
      * Defines the accessible ARIA name of the component.
      *
@@ -252,13 +258,21 @@ declare class Table extends UI5Element {
      */
     rowActionCount: number;
     /**
+     * Determines whether the table rows are displayed with alternating background colors.
+     *
+     * @default false
+     * @since 2.17
+     * @public
+     */
+    alternateRowColors: boolean;
+    /**
      * Defines the sticky top offset of the table, if other sticky elements outside of the table exist.
      */
     stickyTop: string;
     _invalidate: number;
     _renderNavigated: boolean;
     dropIndicatorDOM: DropIndicator;
-    _nodataRow?: TableRow;
+    _noDataRow?: TableRow;
     _endRow: TableRow;
     _tableElement: HTMLElement;
     _beforeElement: HTMLElement;
@@ -270,9 +284,10 @@ declare class Table extends UI5Element {
     _onResizeBound: ResizeObserverCallback;
     _tableNavigation?: TableNavigation;
     _tableDragAndDrop?: TableDragAndDrop;
+    _tableCustomAnnouncement?: TableCustomAnnouncement;
     _poppedIn: Array<{
         col: TableHeaderCell;
-        width: float;
+        width: number;
     }>;
     _containerWidth: number;
     constructor();
@@ -311,11 +326,15 @@ declare class Table extends UI5Element {
         };
     };
     get _gridTemplateColumns(): string | undefined;
+    get _hasFlexibleColumns(): boolean;
+    get _isRowSelectorRequired(): boolean | undefined;
     get _scrollContainer(): HTMLElement;
     get _stickyElements(): (TableHeaderRow | TableHeaderCell)[];
     get _effectiveNoDataText(): string;
     get _ariaLabel(): string | undefined;
-    get _ariaRowCount(): number | undefined;
+    get _ariaDescription(): string | undefined;
+    get _ariaRowCount(): number;
+    get _ariaColCount(): number;
     get _ariaMultiSelectable(): boolean | undefined;
     get isTable(): boolean;
 }

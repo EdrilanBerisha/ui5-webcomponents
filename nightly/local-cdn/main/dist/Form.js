@@ -4,16 +4,19 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var Form_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import { getScopedVarName } from "@ui5/webcomponents-base/dist/CustomElementsScope.js";
+import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
+import { getEffectiveAriaLabelText } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 // Template
 import FormTemplate from "./FormTemplate.js";
 // Styles
 import FormCss from "./generated/themes/Form.css.js";
+import { FORM_ACCESSIBLE_NAME } from "./generated/i18n/i18n-defaults.js";
 const additionalStylesMap = new Map();
 const StepColumn = {
     "S": 1,
@@ -54,10 +57,10 @@ const DEFAULT_FORM_ITEM_LAYOUT_S = "1fr";
  *
  * The Form component reacts and changes its layout on predefined breakpoints.
  * Depending on its size, the Form content (FormGroups and FormItems) gets divided into one or more columns as follows:
- * - **S** (< 600px) – 1 column is recommended (default: 1)
- * - **M** (600px - 1022px) – up to 2 columns are recommended (default: 1)
- * - **L** (1023px - 1439px) - up to 3 columns are recommended (default: 2)
- * - **XL** (> 1439px) – up to 6 columns are recommended (default: 3)
+ * - **S** (0 - 599px) – 1 column is recommended (default: 1)
+ * - **M** (600px - 1023px) – up to 2 columns are recommended (default: 1)
+ * - **L** (1024px - 1439px) - up to 3 columns are recommended (default: 2)
+ * - **XL** (>= 1440px) – up to 6 columns are recommended (default: 3)
  *
  * To change the layout, use the `layout` property - f.e. layout="S1 M2 L3 XL6".
  *
@@ -171,9 +174,24 @@ const DEFAULT_FORM_ITEM_LAYOUT_S = "1fr";
  * @since 2.0.0
  * @extends UI5Element
  */
-let Form = class Form extends UI5Element {
+let Form = Form_1 = class Form extends UI5Element {
     constructor() {
         super(...arguments);
+        /**
+         * Defines the accessibility mode of the component in "edit" and "display" use-cases.
+         *
+         * Based on the mode, the component renders different HTML elements and ARIA attributes,
+         * which are appropriate for the use-case.
+         *
+         * **Usage:**
+         * - Set this property to "Display", when the form consists of non-editable (e.g. texts) form items.
+         * - Set this property to "Edit", when the form consists of editable (e.g. input fields) form items.
+         *
+         * @default "Display"
+         * @since 2.16.0
+         * @public
+         */
+        this.accessibleMode = "Display";
         /**
          * Defines the number of columns to distribute the form content by breakpoint.
          *
@@ -217,11 +235,19 @@ let Form = class Form extends UI5Element {
          */
         this.emptySpan = "S0 M0 L0 XL0";
         /**
+         * Defines the compoennt heading level,
+         * set by the `headerText`.
+         * @default "H2"
+         * @since 2.10.0
+         * @public
+        */
+        this.headerLevel = "H2";
+        /**
          * Defines the vertical spacing between form items.
          *
-         * **Note:** If the Form is meant to be switched between "non-edit" and "edit" modes,
-         * we recommend using "Large" item spacing in "non-edit" mode, and "Normal" - for "edit" mode,
-         * to avoid "jumping" effect, caused by the hight difference between texts in "non-edit" mode and the input fields in "edit" mode.
+         * **Note:** If the Form is meant to be switched between "display"("non-edit") and "edit" modes,
+         * we recommend using "Large" item spacing in "display"("non-edit") mode, and "Normal" - for "edit" mode,
+         * to avoid "jumping" effect, caused by the hight difference between texts in "display"("non-edit") mode and the input fields in "edit" mode.
          *
          * @default "Normal"
          * @public
@@ -250,6 +276,8 @@ let Form = class Form extends UI5Element {
         this.setFormItemLayout();
         // Define how many columns a group should take.
         this.setGroupsColSpan();
+        // Set item spacing
+        this.setItemsState();
     }
     onAfterRendering() {
         // Create additional CSS for number of columns that are not supported by default.
@@ -329,12 +357,12 @@ let Form = class Form extends UI5Element {
         ].forEach(layout => {
             if (this.isValidFormItemLayout(layout.labelSpan, layout.emptySpan)) {
                 const formItemLayout = layout.labelSpan === MAX_FORM_ITEM_CELLS ? `1fr` : `${layout.labelSpan}fr ${MAX_FORM_ITEM_CELLS - (layout.labelSpan + layout.emptySpan)}fr ${layout.emptySpan}fr`;
-                this.style.setProperty(getScopedVarName(`--ui5-form-item-layout-${layout.breakpoint}`), formItemLayout);
+                this.style.setProperty(`--ui5-form-item-layout-${layout.breakpoint}`, formItemLayout);
             }
             else {
                 // eslint-disable-next-line
                 console.warn(`Form :: invalid usage of emptySpan and/or labelSpan in ${layout.breakpoint} size. The labelSpan must be <=12 and when emptySpace is used - their combined values must not exceed 11.`);
-                this.style.setProperty(getScopedVarName(`--ui5-form-item-layout-${layout.breakpoint}`), layout.breakpoint === "S" ? DEFAULT_FORM_ITEM_LAYOUT_S : DEFAULT_FORM_ITEM_LAYOUT);
+                this.style.setProperty(`--ui5-form-item-layout-${layout.breakpoint}`, layout.breakpoint === "S" ? DEFAULT_FORM_ITEM_LAYOUT_S : DEFAULT_FORM_ITEM_LAYOUT);
             }
         });
     }
@@ -389,23 +417,41 @@ let Form = class Form extends UI5Element {
         // 7 cols & 3 groups => 3, 2, 2
         return index === 0 ? MIN_COL_SPAN + (delta - groups) + 1 : MIN_COL_SPAN + 1;
     }
+    setItemsState() {
+        this.items.forEach((item) => {
+            item.itemSpacing = this.itemSpacing;
+            item.accessibleMode = this.accessibleMode;
+        });
+    }
     get hasGroupItems() {
         return this.items.some((item) => item.isGroup);
     }
     get hasHeader() {
-        return this.hasCustomHeader || !!this.headerText;
+        return this.hasCustomHeader || this.hasHeaderText;
+    }
+    get hasHeaderText() {
+        return !!this.headerText;
     }
     get hasCustomHeader() {
         return !!this.header.length;
     }
+    get effectiveAccessibleName() {
+        if (this.accessibleName || this.accessibleNameRef) {
+            return getEffectiveAriaLabelText(this);
+        }
+        return this.hasHeader ? undefined : Form_1.i18nBundle.getText(FORM_ACCESSIBLE_NAME);
+    }
     get effectiveАccessibleNameRef() {
-        return this.hasCustomHeader ? undefined : `${this._id}-header-text`;
+        if (this.accessibleName || this.accessibleNameRef) {
+            return;
+        }
+        return this.hasHeaderText && !this.hasCustomHeader ? `${this._id}-header-text` : undefined;
     }
     get effectiveAccessibleRole() {
         return this.hasGroupItems ? "region" : "form";
     }
     get groupItemsInfo() {
-        return this.items.map((groupItem) => {
+        return this.items.map((groupItem, index) => {
             const items = this.getItemsInfo(Array.from(groupItem.children));
             breakpoints.forEach(breakpoint => {
                 const cols = ((groupItem[`cols${breakpoint}`]) || 1);
@@ -420,14 +466,19 @@ let Form = class Form extends UI5Element {
                         // eslint-disable-next-line no-continue
                         continue;
                     }
-                    items[currentItem].item.style.setProperty(getScopedVarName(`--ui5-form-item-order-${breakpoint}`), `${column + row * cols}`);
+                    items[currentItem].item.style.setProperty(`--ui5-form-item-order-${breakpoint}`, `${column + row * cols}`);
                     currentItem++;
                 }
             });
+            const accessibleNameRef = groupItem.effectiveAccessibleNameRef;
             return {
                 groupItem,
-                accessibleNameRef: groupItem.headerText ? `${groupItem._id}-group-header-text` : undefined,
+                accessibleName: this.accessibleMode === "Edit" ? groupItem.getEffectiveAccessibleName(index) : undefined,
+                accessibleNameInner: this.accessibleMode === "Edit" ? undefined : groupItem.getEffectiveAccessibleName(index),
+                accessibleNameRef: this.accessibleMode === "Edit" ? accessibleNameRef : undefined,
+                accessibleNameRefInner: this.accessibleMode === "Edit" ? undefined : accessibleNameRef,
                 items: this.getItemsInfo(Array.from(groupItem.children)),
+                role: this.accessibleMode === "Edit" ? "form" : undefined,
             };
         });
     }
@@ -476,11 +527,11 @@ let Form = class Form extends UI5Element {
             }
             else if (step === "M") {
                 supporedColumnsNumber = StepColumn.M;
-                containerQuery = `@container (width > 599px) and (width < 1024px) {`;
+                containerQuery = `@container (min-width: 600px) and (max-width: 1023px) {`;
             }
             else if (step === "L") {
                 supporedColumnsNumber = StepColumn.L;
-                containerQuery = `@container (width > 1023px) and (width < 1439px) {`;
+                containerQuery = `@container (min-width: 1024px) and (max-width: 1439px) {`;
             }
             else if (step === "XL") {
                 containerQuery = `@container (min-width: 1440px) {`;
@@ -516,6 +567,15 @@ let Form = class Form extends UI5Element {
 };
 __decorate([
     property()
+], Form.prototype, "accessibleName", void 0);
+__decorate([
+    property()
+], Form.prototype, "accessibleNameRef", void 0);
+__decorate([
+    property()
+], Form.prototype, "accessibleMode", void 0);
+__decorate([
+    property()
 ], Form.prototype, "layout", void 0);
 __decorate([
     property()
@@ -528,9 +588,12 @@ __decorate([
 ], Form.prototype, "headerText", void 0);
 __decorate([
     property()
+], Form.prototype, "headerLevel", void 0);
+__decorate([
+    property()
 ], Form.prototype, "itemSpacing", void 0);
 __decorate([
-    slot({ type: HTMLElement })
+    slot()
 ], Form.prototype, "header", void 0);
 __decorate([
     slot({
@@ -576,7 +639,10 @@ __decorate([
 __decorate([
     property({ type: Number })
 ], Form.prototype, "emptySpanXl", void 0);
-Form = __decorate([
+__decorate([
+    i18n("@ui5/webcomponents")
+], Form, "i18nBundle", void 0);
+Form = Form_1 = __decorate([
     customElement({
         tag: "ui5-form",
         renderer: jsxRenderer,

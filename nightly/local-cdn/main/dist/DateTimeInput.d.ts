@@ -4,6 +4,7 @@ import Input from "./Input.js";
  * Intended to be used for the DateTime components.
  *
  * @class
+ * @extends Input
  * @private
  */
 declare class DateTimeInput extends Input {
@@ -17,5 +18,11 @@ declare class DateTimeInput extends Input {
      */
     get hasValueStateMessage(): boolean;
     get _isMobileDevice(): boolean;
+    /**
+     * Override to handle nested slot structure from DatePicker -> DateTimeInput slot forwarding.
+     * Assumes DateTimeInput always has slot-within-slot structure for valueStateMessage.
+     * @override
+     */
+    get ariaValueStateHiddenText(): string | undefined;
 }
 export default DateTimeInput;

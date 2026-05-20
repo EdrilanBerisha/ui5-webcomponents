@@ -8,7 +8,7 @@ var DynamicPageTitle_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
@@ -116,10 +116,19 @@ let DynamicPageTitle = DynamicPageTitle_1 = class DynamicPageTitle extends UI5El
     get _headerExpanded() {
         return !this.snapped;
     }
+    get _role() {
+        return this.interactive ? "button" : undefined;
+    }
+    get _ariaDescribedBy() {
+        return this.interactive ? `${this._id}-toggle-description` : undefined;
+    }
     get _ariaDescribedbyText() {
-        return DynamicPageTitle_1.i18nBundle.getText(DYNAMIC_PAGE_ARIA_DESCR_TOGGLE_HEADER);
+        return this.interactive ? DynamicPageTitle_1.i18nBundle.getText(DYNAMIC_PAGE_ARIA_DESCR_TOGGLE_HEADER) : undefined;
     }
     get _ariaLabelledBy() {
+        if (!this.interactive) {
+            return undefined;
+        }
         const hasAnyHeading = this[this.headingSlotName].length;
         if (hasAnyHeading) {
             return `${this._id}-heading`;
@@ -127,6 +136,9 @@ let DynamicPageTitle = DynamicPageTitle_1 = class DynamicPageTitle extends UI5El
     }
     get _needsSeparator() {
         return (this.navigationBar.length > 0 && this.actionsBar.length > 0);
+    }
+    get forAriaExpanded() {
+        return this.interactive ? this._headerExpanded : undefined;
     }
     prepareLayoutActions() {
         const navigationBar = this.querySelector("[ui5-toolbar][slot='navigationBar']"), isWideScreen = this.offsetWidth >= 1280;

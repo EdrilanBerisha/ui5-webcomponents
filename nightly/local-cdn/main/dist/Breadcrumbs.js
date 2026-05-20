@@ -8,7 +8,7 @@ var Breadcrumbs_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import ItemNavigation from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
@@ -52,6 +52,7 @@ import breadcrumbsPopoverCss from "./generated/themes/BreadcrumbsPopover.css.js"
  * - [End] - Navigates to the last item.
  * @constructor
  * @extends UI5Element
+ * @implements {IToolbarItemContent}
  * @public
  * @since 1.0.0-rc.15
  */
@@ -85,7 +86,7 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
         // the width of the interactive element that opens the overflow
         this._dropdownArrowLinkWidth = 0;
         this._itemNavigation = new ItemNavigation(this, {
-            navigationMode: NavigationMode.Horizontal,
+            navigationMode: NavigationMode.Auto,
             getItemsCallback: () => this._getFocusableItems(),
         });
         this._onResizeHandler = this._updateOverflow.bind(this);
@@ -133,7 +134,7 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
     _initItemNavigation() {
         if (!this._itemNavigation) {
             this._itemNavigation = new ItemNavigation(this, {
-                navigationMode: NavigationMode.Horizontal,
+                navigationMode: NavigationMode.Auto,
                 getItemsCallback: () => this._getFocusableItems(),
             });
         }
@@ -151,6 +152,9 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
             items.push(this._labelFocusAdaptor);
         }
         return items;
+    }
+    getFocusDomRef() {
+        return this._itemNavigation._getCurrentItem();
     }
     /**
      * Returns the translatable accessible name for the popover
@@ -243,6 +247,15 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
     }
     _onLinkPress(e) {
         const link = e.target, items = this._getItems(), item = items.find(x => `${x._id}-link` === link.id), { altKey, ctrlKey, metaKey, shiftKey, } = e.detail;
+        if (!item.fireDecoratorEvent("click", {
+            altKey,
+            ctrlKey,
+            metaKey,
+            shiftKey,
+        })) {
+            e.preventDefault();
+            return;
+        }
         if (!this.fireDecoratorEvent("item-click", {
             item,
             altKey,
@@ -255,6 +268,14 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
     }
     _onLabelPress(e) {
         const items = this._getItems(), item = items[items.length - 1], { altKey, ctrlKey, metaKey, shiftKey, } = e;
+        if (!item.fireDecoratorEvent("click", {
+            altKey,
+            ctrlKey,
+            metaKey,
+            shiftKey,
+        })) {
+            return;
+        }
         this.fireDecoratorEvent("item-click", {
             item,
             altKey,
@@ -265,6 +286,14 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
     }
     _onOverflowListItemSelect(e) {
         const listItem = e.detail.selectedItems[0], items = this._getItems(), item = items.find(x => `${x._id}-li` === listItem.id);
+        if (!item.fireDecoratorEvent("click", {
+            altKey: false,
+            ctrlKey: false,
+            metaKey: false,
+            shiftKey: false,
+        })) {
+            return;
+        }
         if (this.fireDecoratorEvent("item-click", { item })) {
             locationOpen(item.href, item.target || "_self", "noopener,noreferrer");
             this.responsivePopover.open = false;
@@ -382,6 +411,15 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
             .reverse();
     }
     /**
+     * Returns all items that should be displayed in the popover on mobile devices
+     * @private
+     */
+    get _mobilePopoverItems() {
+        return this._getItems()
+            .filter(item => this._isItemVisible(item))
+            .reverse();
+    }
+    /**
      * Getter for the list of abstract breadcrumb items to be rendered as links outside the overflow
      */
     get _linksData() {
@@ -439,6 +477,9 @@ let Breadcrumbs = Breadcrumbs_1 = class Breadcrumbs extends UI5Element {
     }
     get _cancelButtonText() {
         return Breadcrumbs_1.i18nBundle.getText(BREADCRUMBS_CANCEL_BUTTON);
+    }
+    get hasOverflow() {
+        return true;
     }
 };
 __decorate([

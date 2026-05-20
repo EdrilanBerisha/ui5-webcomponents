@@ -1,5 +1,10 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { AriaRole } from "@ui5/webcomponents-base";
+import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type FormItemSpacing from "./types/FormItemSpacing.js";
+import type FormAccessibleMode from "./types/FormAccessibleMode.js";
+import type TitleLevel from "./types/TitleLevel.js";
 /**
  * Interface for components that can be slotted inside `ui5-form` as items.
  * @public
@@ -14,11 +19,17 @@ interface IFormItem extends UI5Element {
     colsS?: number;
     columnSpan?: number;
     headerText?: string;
+    headerLevel?: `${TitleLevel}`;
+    accessibleMode?: `${FormAccessibleMode}`;
 }
 type GroupItemsInfo = {
     groupItem: IFormItem;
     items: Array<ItemsInfo>;
+    accessibleName: string | undefined;
+    accessibleNameInner: string | undefined;
     accessibleNameRef: string | undefined;
+    accessibleNameRefInner: string | undefined;
+    role: AriaRole | undefined;
 };
 type ItemsInfo = {
     item: IFormItem;
@@ -52,10 +63,10 @@ type ItemsInfo = {
  *
  * The Form component reacts and changes its layout on predefined breakpoints.
  * Depending on its size, the Form content (FormGroups and FormItems) gets divided into one or more columns as follows:
- * - **S** (< 600px) – 1 column is recommended (default: 1)
- * - **M** (600px - 1022px) – up to 2 columns are recommended (default: 1)
- * - **L** (1023px - 1439px) - up to 3 columns are recommended (default: 2)
- * - **XL** (> 1439px) – up to 6 columns are recommended (default: 3)
+ * - **S** (0 - 599px) – 1 column is recommended (default: 1)
+ * - **M** (600px - 1023px) – up to 2 columns are recommended (default: 1)
+ * - **L** (1024px - 1439px) - up to 3 columns are recommended (default: 2)
+ * - **XL** (>= 1440px) – up to 6 columns are recommended (default: 3)
  *
  * To change the layout, use the `layout` property - f.e. layout="S1 M2 L3 XL6".
  *
@@ -171,6 +182,35 @@ type ItemsInfo = {
  */
 declare class Form extends UI5Element {
     /**
+     * Defines the accessible ARIA name of the component.
+     * @default undefined
+     * @public
+     * @since 2.10.0
+     */
+    accessibleName?: string;
+    /**
+     * Defines id (or many ids) of the element (or elements) that label the component.
+     * @default undefined
+     * @public
+     * @since 2.16.0
+     */
+    accessibleNameRef?: string;
+    /**
+     * Defines the accessibility mode of the component in "edit" and "display" use-cases.
+     *
+     * Based on the mode, the component renders different HTML elements and ARIA attributes,
+     * which are appropriate for the use-case.
+     *
+     * **Usage:**
+     * - Set this property to "Display", when the form consists of non-editable (e.g. texts) form items.
+     * - Set this property to "Edit", when the form consists of editable (e.g. input fields) form items.
+     *
+     * @default "Display"
+     * @since 2.16.0
+     * @public
+     */
+    accessibleMode: `${FormAccessibleMode}`;
+    /**
      * Defines the number of columns to distribute the form content by breakpoint.
      *
      * Supported values:
@@ -222,11 +262,19 @@ declare class Form extends UI5Element {
      */
     headerText?: string;
     /**
+     * Defines the compoennt heading level,
+     * set by the `headerText`.
+     * @default "H2"
+     * @since 2.10.0
+     * @public
+    */
+    headerLevel: `${TitleLevel}`;
+    /**
      * Defines the vertical spacing between form items.
      *
-     * **Note:** If the Form is meant to be switched between "non-edit" and "edit" modes,
-     * we recommend using "Large" item spacing in "non-edit" mode, and "Normal" - for "edit" mode,
-     * to avoid "jumping" effect, caused by the hight difference between texts in "non-edit" mode and the input fields in "edit" mode.
+     * **Note:** If the Form is meant to be switched between "display"("non-edit") and "edit" modes,
+     * we recommend using "Large" item spacing in "display"("non-edit") mode, and "Normal" - for "edit" mode,
+     * to avoid "jumping" effect, caused by the hight difference between texts in "display"("non-edit") mode and the input fields in "edit" mode.
      *
      * @default "Normal"
      * @public
@@ -238,7 +286,7 @@ declare class Form extends UI5Element {
      * **Note:** When a `header` is provided, the `headerText` property is ignored.
      * @public
      */
-    header: Array<HTMLElement>;
+    header: Slot<HTMLElement>;
     /**
      * Defines the component content - FormGroups or FormItems.
      *
@@ -246,7 +294,8 @@ declare class Form extends UI5Element {
      * Either use FormGroups and make sure all FormItems are part of a FormGroup, or use just FormItems without any FormGroups.
      * @public
      */
-    items: Array<IFormItem>;
+    items: DefaultSlot<IFormItem>;
+    static i18nBundle: I18nBundle;
     /**
      * @private
      */
@@ -271,9 +320,12 @@ declare class Form extends UI5Element {
     setFastNavGroup(): void;
     setGroupsColSpan(): void;
     getGroupsColSpan(cols: number, groups: number, index: number, group: IFormItem): number;
+    setItemsState(): void;
     get hasGroupItems(): boolean;
     get hasHeader(): boolean;
+    get hasHeaderText(): boolean;
     get hasCustomHeader(): boolean;
+    get effectiveAccessibleName(): string | undefined;
     get effectiveАccessibleNameRef(): string | undefined;
     get effectiveAccessibleRole(): "form" | "region";
     get groupItemsInfo(): Array<GroupItemsInfo>;

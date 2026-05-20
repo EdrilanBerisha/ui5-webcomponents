@@ -135,7 +135,7 @@ let Link = Link_1 = class Link extends UI5Element {
         }
     }
     onBeforeRendering() {
-        const needsNoReferrer = this.target !== "_self"
+        const needsNoReferrer = this.target === "_blank"
             && this.href
             && this._isCrossOrigin(this.href);
         this._rel = needsNoReferrer ? "noreferrer noopener" : undefined;
@@ -150,7 +150,7 @@ let Link = Link_1 = class Link extends UI5Element {
         if (this.forcedTabIndex) {
             return Number.parseInt(this.forcedTabIndex);
         }
-        return (this.disabled || !this.textContent?.length) ? -1 : 0;
+        return this.disabled ? -1 : 0;
     }
     get ariaLabelText() {
         return getEffectiveAriaLabelText(this);
@@ -195,6 +195,7 @@ let Link = Link_1 = class Link extends UI5Element {
     _onkeydown(e) {
         if (isEnter(e) && !this.href) {
             this._onclick(e);
+            e.preventDefault();
         }
         else if (isSpace(e)) {
             e.preventDefault();

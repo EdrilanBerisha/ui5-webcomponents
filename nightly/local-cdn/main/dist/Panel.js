@@ -9,14 +9,16 @@ import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import slideDown from "@ui5/webcomponents-base/dist/animations/slideDown.js";
 import slideUp from "@ui5/webcomponents-base/dist/animations/slideUp.js";
-import { isSpace, isEnter } from "@ui5/webcomponents-base/dist/Keys.js";
+import { isSpace, isEnter, isEscape } from "@ui5/webcomponents-base/dist/Keys.js";
 import AnimationMode from "@ui5/webcomponents-base/dist/types/AnimationMode.js";
 import { getAnimationMode } from "@ui5/webcomponents-base/dist/config/AnimationMode.js";
+import { supportsTouch } from "@ui5/webcomponents-base/dist/Device.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
+import { getTabbableElements } from "@ui5/webcomponents-base/dist/util/TabbableElements.js";
 import PanelTemplate from "./PanelTemplate.js";
 import { PANEL_ICON } from "./generated/i18n/i18n-defaults.js";
 // Styles
@@ -139,6 +141,14 @@ let Panel = Panel_1 = class Panel extends UI5Element {
         this._hasHeader = false;
         this._contentExpanded = false;
         this._animationRunning = false;
+        this._pendingToggle = false;
+        this._touched = false;
+        /**
+         * Indicates whether the content area should be focusable.
+         * This is true when content is scrollable and has no focusable children.
+         * @private
+         */
+        this._contentFocusable = false;
     }
     onBeforeRendering() {
         // If the animation is running, it will set the content expanded state at the end
@@ -146,6 +156,9 @@ let Panel = Panel_1 = class Panel extends UI5Element {
             this._contentExpanded = !this.collapsed;
         }
         this._hasHeader = !!this.header.length;
+    }
+    onAfterRendering() {
+        this._updateContentFocusable();
     }
     shouldToggle(element) {
         const customContent = this.header.length;
@@ -157,6 +170,14 @@ let Panel = Panel_1 = class Panel extends UI5Element {
     get shouldNotAnimate() {
         return this.noAnimation || getAnimationMode() === AnimationMode.None;
     }
+    _isMobile() {
+        if (supportsTouch()) {
+            this._touched = true;
+        }
+    }
+    _headerFocusOut() {
+        this._touched = false;
+    }
     _headerClick(e) {
         if (!this.shouldToggle(e.target)) {
             return;
@@ -164,7 +185,7 @@ let Panel = Panel_1 = class Panel extends UI5Element {
         this._toggleOpen();
     }
     _toggleButtonClick(e) {
-        if (e.x === 0 && e.y === 0) {
+        if (e.detail.originalEvent.x === 0 && e.detail.originalEvent.y === 0) {
             e.stopImmediatePropagation();
         }
     }
@@ -173,10 +194,16 @@ let Panel = Panel_1 = class Panel extends UI5Element {
             return;
         }
         if (isEnter(e)) {
-            e.preventDefault();
+            this._toggleOpen();
         }
         if (isSpace(e)) {
             e.preventDefault();
+            this._pendingToggle = true;
+        }
+        // Cancel toggle if Escape is pressed
+        if (isEscape(e) && this._pendingToggle) {
+            e.preventDefault();
+            this._pendingToggle = false;
         }
     }
     _headerKeyUp(e) {
@@ -184,10 +211,14 @@ let Panel = Panel_1 = class Panel extends UI5Element {
             return;
         }
         if (isEnter(e)) {
-            this._toggleOpen();
+            e.preventDefault();
         }
         if (isSpace(e)) {
-            this._toggleOpen();
+            // Only toggle if space was pressed and escape wasn't pressed to cancel
+            if (this._pendingToggle) {
+                this._toggleOpen();
+            }
+            this._pendingToggle = false;
         }
     }
     _toggleOpen() {
@@ -218,6 +249,44 @@ let Panel = Panel_1 = class Panel extends UI5Element {
     }
     _headerOnTarget(target) {
         return target.classList.contains("sapMPanelWrappingDiv");
+    }
+    /**
+     * Updates the focusability of the content area.
+     * Content becomes focusable when:
+     * - Panel is expanded (not collapsed)
+     * - Content is scrollable (scrollHeight > clientHeight or scrollWidth > clientWidth)
+     * - No focusable children exist inside
+     * @private
+     */
+    _updateContentFocusable() {
+        // Not focusable when collapsed
+        if (this.collapsed) {
+            this._contentFocusable = false;
+            return;
+        }
+        const contentDom = this.shadowRoot?.querySelector(".ui5-panel-content");
+        if (!contentDom) {
+            this._contentFocusable = false;
+            return;
+        }
+        // Check if scrollable (vertical OR horizontal)
+        const isScrollable = contentDom.scrollHeight > contentDom.clientHeight
+            || contentDom.scrollWidth > contentDom.clientWidth;
+        if (!isScrollable) {
+            this._contentFocusable = false;
+            return;
+        }
+        // Check for focusable children (synchronous)
+        const tabbables = getTabbableElements(contentDom);
+        this._contentFocusable = tabbables.length === 0;
+    }
+    /**
+     * Returns the tabindex for the content area.
+     * Returns 0 when content should be focusable, undefined otherwise (removes attribute).
+     * @private
+     */
+    get _contentTabIndex() {
+        return this._contentFocusable ? 0 : undefined;
     }
     get toggleButtonTitle() {
         return Panel_1.i18nBundle.getText(PANEL_ICON);
@@ -310,6 +379,15 @@ __decorate([
 __decorate([
     property({ type: Boolean, noAttribute: true })
 ], Panel.prototype, "_animationRunning", void 0);
+__decorate([
+    property({ type: Boolean, noAttribute: true })
+], Panel.prototype, "_pendingToggle", void 0);
+__decorate([
+    property({ type: Boolean })
+], Panel.prototype, "_touched", void 0);
+__decorate([
+    property({ type: Boolean, noAttribute: true })
+], Panel.prototype, "_contentFocusable", void 0);
 __decorate([
     slot()
 ], Panel.prototype, "header", void 0);

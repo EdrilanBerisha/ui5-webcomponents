@@ -1,5 +1,6 @@
 import type { ClassMap } from "@ui5/webcomponents-base/dist/types.js";
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type { ResizeObserverCallback } from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
 import PopupAccessibleRole from "./types/PopupAccessibleRole.js";
 type PopupScrollEventDetail = {
@@ -81,6 +82,25 @@ declare abstract class Popup extends UI5Element {
      */
     accessibleRole: `${PopupAccessibleRole}`;
     /**
+     * Defines the accessible description of the component.
+     * @default undefined
+     * @public
+     * @since 2.11.0
+     */
+    accessibleDescription?: string;
+    /**
+     * Receives id(or many ids) of the elements that describe the component.
+     * @default undefined
+     * @public
+     * @since 2.11.0
+     */
+    accessibleDescriptionRef?: string;
+    /**
+     * Constantly updated value of texts collected from the associated labels.
+     * @private
+     */
+    _associatedDescriptionRefTexts?: string;
+    /**
      * Defines the current media query size.
      * @private
      */
@@ -104,7 +124,7 @@ declare abstract class Popup extends UI5Element {
      * Defines the content of the Popup.
      * @public
      */
-    content: Array<HTMLElement>;
+    content: DefaultSlot<HTMLElement>;
     /**
      * @private
      */
@@ -118,10 +138,12 @@ declare abstract class Popup extends UI5Element {
     _focusedElementBeforeOpen?: HTMLElement | null;
     _opened: boolean;
     _open: boolean;
+    _resizeHandlerRegistered: boolean;
     constructor();
     onBeforeRendering(): void;
     onAfterRendering(): void;
     onEnterDOM(): void;
+    handleOpenOnEnterDOM(): void;
     onExitDOM(): void;
     /**
      * Indicates if the element is open
@@ -137,6 +159,8 @@ declare abstract class Popup extends UI5Element {
      * Prevents the user from interacting with the content under the block layer
      */
     _preventBlockLayerFocus(e: KeyboardEvent | MouseEvent): void;
+    _attachBrowserEvents(): void;
+    _detachBrowserEvents(): void;
     /**
      * Temporarily removes scrollbars from the html element
      * @protected
@@ -177,6 +201,7 @@ declare abstract class Popup extends UI5Element {
     applyFocus(): Promise<void>;
     isFocusWithin(): boolean;
     _updateMediaRange(): void;
+    _updateAssociatedLabelsTexts(): void;
     /**
      * Adds the popup to the "opened popups registry"
      * @protected
@@ -201,6 +226,8 @@ declare abstract class Popup extends UI5Element {
      * @protected
      */
     _show(): void;
+    _registerResizeHandler(): void;
+    _deregisterResizeHandler(): void;
     /**
      * Sets "none" display to the popup
      * @protected
@@ -221,6 +248,10 @@ declare abstract class Popup extends UI5Element {
      * @protected
      */
     get _ariaLabel(): string | undefined;
+    get _accInfoAriaDescription(): string;
+    get ariaDescriptionText(): string | undefined;
+    get ariaDescriptionTextId(): "" | "accessibleDescription";
+    get ariaDescribedByIds(): string;
     get _root(): HTMLElement;
     get _role(): "dialog" | "alertdialog" | undefined;
     get _ariaModal(): "true" | undefined;

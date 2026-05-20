@@ -5,13 +5,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
-import getEffectiveScrollbarStyle from "@ui5/webcomponents-base/dist/util/getEffectiveScrollbarStyle.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import { getAnimationMode } from "@ui5/webcomponents-base/dist/config/AnimationMode.js";
-import { getScopedVarName } from "@ui5/webcomponents-base/dist/CustomElementsScopeUtils.js";
 import AnimationMode from "@ui5/webcomponents-base/dist/types/AnimationMode.js";
 // Template
 import PageTemplate from "./PageTemplate.js";
@@ -80,7 +78,7 @@ let Page = class Page extends UI5Element {
         this.hideFooter = false;
     }
     onEnterDOM() {
-        this.style.setProperty(getScopedVarName("--_ui5-page-animation-duration"), getAnimationMode() === AnimationMode.None ? "0s" : "0.35s");
+        this.style.setProperty("--_ui5-page-animation-duration", getAnimationMode() === AnimationMode.None ? "0s" : "0.35s");
     }
     get _contentBottom() {
         return this.fixedFooter && !this.hideFooter ? "2.75rem" : "0";
@@ -90,16 +88,6 @@ let Page = class Page extends UI5Element {
     }
     get _contentTop() {
         return this.header.length ? "2.75rem" : "0rem";
-    }
-    get styles() {
-        return {
-            content: {
-                "padding-bottom": this.footer.length && this._contentPaddingBottom,
-                "scroll-padding-bottom": this.footer.length && this._contentPaddingBottom,
-                "bottom": this.footer.length && this._contentBottom,
-                "top": this._contentTop,
-            },
-        };
     }
 };
 __decorate([
@@ -130,7 +118,6 @@ Page = __decorate([
         renderer: jsxRenderer,
         styles: [
             PageCss,
-            getEffectiveScrollbarStyle(),
         ],
         template: PageTemplate,
     })

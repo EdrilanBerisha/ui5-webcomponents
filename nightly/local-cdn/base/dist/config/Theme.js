@@ -5,9 +5,17 @@ import getThemeDesignerTheme from "../theming/getThemeDesignerTheme.js";
 import { DEFAULT_THEME, SUPPORTED_THEMES } from "../generated/AssetParameters.js";
 import { boot, isBooted } from "../Boot.js";
 import { attachConfigurationReset } from "./ConfigurationReset.js";
+import { fireConfigChange, attachConfigChange, getSharedValue } from "./ConfigurationSync.js";
 let curTheme;
+let curBaseTheme;
 attachConfigurationReset(() => {
     curTheme = undefined;
+});
+attachConfigChange("theme", (theme) => {
+    curTheme = theme;
+    if (isBooted()) {
+        applyTheme(curTheme).then(() => reRenderAllUI5Elements({ themeAware: true }));
+    }
 });
 /**
  * Returns the current theme.
@@ -16,7 +24,7 @@ attachConfigurationReset(() => {
  */
 const getTheme = () => {
     if (curTheme === undefined) {
-        curTheme = getConfiguredTheme();
+        curTheme = getSharedValue("theme") ?? getConfiguredTheme();
     }
     return curTheme;
 };
@@ -31,6 +39,7 @@ const setTheme = async (theme) => {
         return;
     }
     curTheme = theme;
+    fireConfigChange("theme", theme);
     if (isBooted()) {
         // Update CSS Custom Properties
         await applyTheme(curTheme);
@@ -76,5 +85,21 @@ const isLegacyThemeFamilyAsync = async () => {
     return isLegacyThemeFamily();
 };
 const isKnownTheme = (theme) => SUPPORTED_THEMES.includes(theme);
-export { getTheme, setTheme, isTheme, isLegacyThemeFamily, isLegacyThemeFamilyAsync, getDefaultTheme, };
+/**
+ * Returns the base theme of external theme.
+ * @private
+ * @returns {string | undefined} the base theme name
+ */
+const getBaseTheme = () => {
+    return curBaseTheme;
+};
+/**
+ * Sets the base theme of the current external theme.
+ * @param { string | undefined } theme the name of the new base theme
+ * @private
+ */
+const setBaseTheme = (theme) => {
+    curBaseTheme = theme;
+};
+export { getTheme, setTheme, isTheme, isLegacyThemeFamily, isLegacyThemeFamilyAsync, getDefaultTheme, getBaseTheme, setBaseTheme, };
 //# sourceMappingURL=Theme.js.map

@@ -8,10 +8,11 @@ var Slider_1;
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { isEscape } from "@ui5/webcomponents-base/dist/Keys.js";
+import { isEscape, isF2 } from "@ui5/webcomponents-base/dist/Keys.js";
 import SliderBase from "./SliderBase.js";
 // Template
 import SliderTemplate from "./SliderTemplate.js";
+import styles from "./generated/themes/Slider.css.js";
 // Texts
 import { SLIDER_ARIA_DESCRIPTION, SLIDER_TOOLTIP_INPUT_DESCRIPTION, SLIDER_TOOLTIP_INPUT_LABEL, } from "./generated/i18n/i18n-defaults.js";
 /**
@@ -82,59 +83,33 @@ let Slider = Slider_1 = class Slider extends SliderBase {
          * @public
          */
         this.value = 0;
+        /**
+         * Defines the size of the slider's selection intervals (e.g. min = 0, max = 10, step = 5 would result in possible selection of the values 0, 5, 10).
+         *
+         * **Note:** If set to 0 the slider handle movement is disabled.
+         * @default 1
+         * @public
+         */
+        this.step = 1;
+        this.tooltipValueState = "None";
+        this.tooltipValue = "";
         this._progressPercentage = 0;
         this._handlePositionFromStart = 0;
-        this._tooltipInputValue = this.value.toString();
-        this._tooltipInputValueState = "None";
-        this._stateStorage.value = undefined;
         this._lastValidInputValue = this.min.toString();
     }
     /**
-     *
-     * Check if the previously saved state is outdated. That would mean
-     * either it is the initial rendering or that a property has been changed
-     * programmatically - because the previous state is always updated in
-     * the interaction handlers.
-     *
-     * Normalize current properties, update the previously stored state.
-     * Update the visual UI representation of the Slider.
-     *
+     * The value is visually clamped to min/max but the property is not modified.
+     * @private
      */
     onBeforeRendering() {
-        if (this.editableTooltip) {
-            this._updateInputValue();
-        }
-        if (!this.isCurrentStateOutdated()) {
-            return;
-        }
-        this.notResized = true;
-        this.syncUIAndState();
-        this._updateHandleAndProgress(this.value);
+        // Clamp value visually without modifying the actual value property
+        const ctor = this.constructor;
+        const clampedValue = ctor.clipValue(this.value, this.min, this.max);
+        this._updateHandleAndProgress(clampedValue);
     }
-    syncUIAndState() {
-        // Validate step and update the stored state for the step property.
-        if (this.isPropertyUpdated("step")) {
-            this._validateStep(this.step);
-            this.storePropertyState("step");
-        }
-        // Recalculate the tickmarks and labels and update the stored state.
-        if (this.isPropertyUpdated("min", "max", "value")) {
-            this.storePropertyState("min", "max");
-            // Here the value props are changed programmatically (not by user interaction)
-            // and it won't be "stepified" (rounded to the nearest step). 'Clip' them within
-            // min and max bounderies and update the previous state reference.
-            this.value = SliderBase.clipValue(this.value, this._effectiveMin, this._effectiveMax);
-            this.updateStateStorageAndFireInputEvent("value");
-            this.storePropertyState("value");
-        }
-        // Labels must be updated if any of the min/max/step/labelInterval props are changed
-        if (this.labelInterval && this.showTickmarks) {
-            this._createLabels();
-        }
-        // Update the stored state for the labelInterval, if changed
-        if (this.isPropertyUpdated("labelInterval")) {
-            this.storePropertyState("labelInterval");
-        }
+    onAfterRendering() {
+        super.onAfterRendering();
+        this.tooltip?.repositionTooltip();
     }
     /**
      * Called when the user starts interacting with the slider
@@ -143,7 +118,7 @@ let Slider = Slider_1 = class Slider extends SliderBase {
     _onmousedown(e) {
         // If step is 0 no interaction is available because there is no constant
         // (equal for all user environments) quantitative representation of the value
-        if (this.disabled || this.step === 0 || e.target.hasAttribute("ui5-input")) {
+        if (this.disabled || this.step === 0 || e.target.hasAttribute("ui5-slider-tooltip")) {
             return;
         }
         const newValue = this.handleDownBase(e);
@@ -156,8 +131,10 @@ let Slider = Slider_1 = class Slider extends SliderBase {
         // Do not yet update the Slider if press is over a handle. It will be updated if the user drags the mouse.
         const ctor = this.constructor;
         if (!this._isHandlePressed(ctor.getPageXValueFromEvent(e))) {
+            const stepPrecision = ctor._getDecimalPrecisionOfNumber(this.step);
             this._updateHandleAndProgress(newValue);
             this.value = newValue;
+            this.tooltipValue = newValue.toFixed(stepPrecision);
             this.updateStateStorageAndFireInputEvent("value");
         }
     }
@@ -168,7 +145,7 @@ let Slider = Slider_1 = class Slider extends SliderBase {
             this._valueInitial = this.value;
         }
         if (this.showTooltip) {
-            this._tooltipVisibility = SliderBase.TOOLTIP_VISIBILITY.VISIBLE;
+            this._tooltipsOpen = true;
         }
     }
     _onfocusout(e) {
@@ -181,37 +158,62 @@ let Slider = Slider_1 = class Slider extends SliderBase {
         // Reset focus state and the stored Slider's initial
         // value that was saved when it was first focused in
         this._valueInitial = undefined;
-        if (this.showTooltip && !e.relatedTarget?.hasAttribute("ui5-input")) {
-            this._tooltipVisibility = SliderBase.TOOLTIP_VISIBILITY.HIDDEN;
+        if (this.showTooltip && !e.relatedTarget?.hasAttribute("ui5-slider-tooltip")) {
+            this._tooltipsOpen = false;
         }
+    }
+    _onTooltipChange(e) {
+        const value = parseFloat(e.detail.value);
+        const isInvalid = (value < this.min || value > this.max) || Number.isNaN(value);
+        if (isInvalid) {
+            this.tooltipValueState = "Negative";
+            this.tooltipValue = `${value}`;
+            return;
+        }
+        this.tooltipValueState = "None";
+        this.value = value;
+        this.fireDecoratorEvent("change");
+    }
+    _onTooltipFocusChange() {
+        const value = parseFloat(this.tooltipValue);
+        const isInvalid = (value < this.min || value > this.max) || Number.isNaN(value);
+        if (isInvalid) {
+            this.tooltipValueState = "None";
+            this.tooltipValue = this.value.toString();
+        }
+    }
+    _onTooltipKeydown(e) {
+        if (isF2(e)) {
+            e.preventDefault();
+            this._sliderHandle.focus();
+        }
+    }
+    _onTooltipOpen() {
+        const ctor = this.constructor;
+        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this.step);
+        this.tooltipValue = this.value.toFixed(stepPrecision);
+    }
+    _onTooltipInput(e) {
+        this.tooltipValue = e.detail.value;
     }
     /**
      * Called when the user moves the slider
      * @private
      */
     _handleMove(e) {
-        if (e.target.hasAttribute("ui5-input")) {
-            return;
-        }
         e.preventDefault();
-        // If step is 0 no interaction is available because there is no constant
-        // (equal for all user environments) quantitative representation of the value
-        if (this.disabled || this._effectiveStep === 0) {
-            return;
-        }
         const ctor = this.constructor;
-        const newValue = ctor.getValueFromInteraction(e, this._effectiveStep, this._effectiveMin, this._effectiveMax, this.getBoundingClientRect(), this.directionStart);
+        const newValue = ctor.getValueFromInteraction(e, this.step, this.min, this.max, this.getBoundingClientRect(), this.directionStart);
+        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this.step);
         this._updateHandleAndProgress(newValue);
         this.value = newValue;
+        this.tooltipValue = newValue.toFixed(stepPrecision);
         this.updateStateStorageAndFireInputEvent("value");
     }
     /** Called when the user finish interacting with the slider
      * @private
      */
-    _handleUp(e) {
-        if (e.target.hasAttribute("ui5-input")) {
-            return;
-        }
+    _handleUp() {
         if (this._valueOnInteractionStart !== this.value) {
             this.fireDecoratorEvent("change");
         }
@@ -226,32 +228,6 @@ let Slider = Slider_1 = class Slider extends SliderBase {
         }
         this._valueOnInteractionStart = this.value;
     }
-    _onInputFocusOut(e) {
-        const tooltipInput = this.shadowRoot.querySelector("[ui5-input]");
-        this._tooltipVisibility = SliderBase.TOOLTIP_VISIBILITY.HIDDEN;
-        this._updateValueFromInput(e);
-        if (!this._isInputValueValid) {
-            tooltipInput.value = this._lastValidInputValue;
-            this._isInputValueValid = true;
-            this._tooltipInputValueState = "None";
-        }
-    }
-    _updateInputValue() {
-        const tooltipInput = this.shadowRoot.querySelector("[ui5-input]");
-        if (!tooltipInput) {
-            return;
-        }
-        this._isInputValueValid = parseFloat(tooltipInput.value) >= this.min && parseFloat(tooltipInput.value) <= this.max;
-        if (!this._isInputValueValid) {
-            this._tooltipInputValue = this._lastValidInputValue;
-            this._isInputValueValid = true;
-            this._tooltipInputValueState = "Negative";
-            return;
-        }
-        this._tooltipInputValue = this.value.toString();
-        this._lastValidInputValue = this._tooltipInputValue;
-        this._tooltipInputValueState = "None";
-    }
     /** Determines if the press is over the handle
      * @private
      */
@@ -263,56 +239,39 @@ let Slider = Slider_1 = class Slider extends SliderBase {
      * @private
      */
     _updateHandleAndProgress(newValue) {
-        const max = this._effectiveMax;
-        const min = this._effectiveMin;
+        const max = this.max;
+        const min = this.min;
         // The progress (completed) percentage of the slider.
         this._progressPercentage = (newValue - min) / (max - min);
         // How many pixels from the left end of the slider will be the placed the affected  by the user action handle
         this._handlePositionFromStart = this._progressPercentage * 100;
     }
     _handleActionKeyPress(e) {
-        const min = this._effectiveMin;
-        const max = this._effectiveMax;
+        const min = this.min;
+        const max = this.max;
         const currentValue = this.value;
         const ctor = this.constructor;
         const newValue = isEscape(e) ? this._valueInitial : ctor.clipValue(this._handleActionKeyPressBase(e, "value") + currentValue, min, max);
         if (newValue !== currentValue) {
+            const stepPrecision = ctor._getDecimalPrecisionOfNumber(this.step);
             this._updateHandleAndProgress(newValue);
             this.value = newValue;
+            this.tooltipValue = this.value.toFixed(stepPrecision);
             this.updateStateStorageAndFireInputEvent("value");
         }
+    }
+    _onTooltopForwardFocus(e) {
+        const tooltip = e.target;
+        tooltip.followRef?.focus();
     }
     get inputValue() {
         return this.value.toString();
     }
-    get styles() {
-        return {
-            progress: {
-                "transform": `scaleX(${this._progressPercentage})`,
-                "transform-origin": `${this.directionStart} top`,
-            },
-            handle: {
-                [this.directionStart]: `${this._handlePositionFromStart}%`,
-            },
-            label: {
-                "width": `${this._labelWidth}%`,
-            },
-            labelContainer: {
-                "width": `100%`,
-                [this.directionStart]: `-${this._labelWidth / 2}%`,
-            },
-            tooltip: {
-                "visibility": `${this._tooltipVisibility}`,
-            },
-        };
+    get tooltip() {
+        return this.getDomRef()?.querySelector("[ui5-slider-tooltip]");
     }
     get _sliderHandle() {
-        return this.shadowRoot.querySelector(".ui5-slider-handle");
-    }
-    get tooltipValue() {
-        const ctor = this.constructor;
-        const stepPrecision = ctor._getDecimalPrecisionOfNumber(this._effectiveStep);
-        return this.value.toFixed(stepPrecision);
+        return this.shadowRoot.querySelector("[ui5-slider-handle]");
     }
     get _ariaDisabled() {
         return this.disabled || undefined;
@@ -320,27 +279,48 @@ let Slider = Slider_1 = class Slider extends SliderBase {
     get _ariaLabelledByText() {
         return Slider_1.i18nBundle.getText(SLIDER_ARIA_DESCRIPTION);
     }
+    get tickmarksObject() {
+        const count = this._tickmarksCount;
+        const arr = [];
+        if (this._hiddenTickmarks) {
+            return [false, false];
+        }
+        for (let i = 0; i <= count; i++) {
+            const tickValue = this._effectiveMin + (i * this.step);
+            arr.push(tickValue <= this.value);
+        }
+        return arr;
+    }
     get _ariaDescribedByInputText() {
         return Slider_1.i18nBundle.getText(SLIDER_TOOLTIP_INPUT_DESCRIPTION);
     }
     get _ariaLabelledByInputText() {
         return Slider_1.i18nBundle.getText(SLIDER_TOOLTIP_INPUT_LABEL);
     }
-    get tickmarksObject() {
-        const count = this._tickmarksCount;
-        const arr = [];
-        if (this._hiddenTickmarks) {
-            return [true, false];
+    _onkeydown(e) {
+        const target = e.target;
+        if (isF2(e) && target.hasAttribute("ui5-slider-handle")) {
+            target.parentNode.querySelector("[ui5-slider-tooltip]").focus();
         }
-        for (let i = 0; i <= count; i++) {
-            arr.push(this._effectiveMin + (i * this.step) <= this.value);
+        if (SliderBase._isActionKey(e) && target && !target.hasAttribute("ui5-slider-tooltip")) {
+            e.preventDefault();
+            this._isUserInteraction = true;
+            this._handleActionKeyPress(e);
         }
-        return arr;
     }
 };
 __decorate([
     property({ type: Number })
 ], Slider.prototype, "value", void 0);
+__decorate([
+    property({ type: Number })
+], Slider.prototype, "step", void 0);
+__decorate([
+    property()
+], Slider.prototype, "tooltipValueState", void 0);
+__decorate([
+    property()
+], Slider.prototype, "tooltipValue", void 0);
 __decorate([
     i18n("@ui5/webcomponents")
 ], Slider, "i18nBundle", void 0);
@@ -349,6 +329,7 @@ Slider = Slider_1 = __decorate([
         tag: "ui5-slider",
         languageAware: true,
         formAssociated: true,
+        styles: [styles],
         template: SliderTemplate,
     })
 ], Slider);

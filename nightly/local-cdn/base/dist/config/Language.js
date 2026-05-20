@@ -4,12 +4,32 @@ import { reRenderAllUI5Elements } from "../Render.js";
 import { DEFAULT_LANGUAGE } from "../generated/AssetParameters.js";
 import { isBooted } from "../Boot.js";
 import { attachConfigurationReset } from "./ConfigurationReset.js";
+import { fireConfigChange, attachConfigChange, getSharedValue } from "./ConfigurationSync.js";
 let curLanguage;
 let fetchDefaultLanguage;
 attachConfigurationReset(() => {
     curLanguage = undefined;
     fetchDefaultLanguage = undefined;
 });
+// Flag indicating that a language change is in progress and not yet complete.
+// While this flag is true, language-aware components will not re-render.
+// These components may rely on language-specific data (e.g., CLDR, language bundles),
+// which might be unavailable during the loading phase.
+// During this phase, all re-rendering is postponed.
+// Once all necessary language data has been loaded, the language change
+// will trigger a re-render of all language-aware components.
+let languageChangePending = false;
+attachConfigChange("language", (language) => {
+    curLanguage = language;
+    languageChangePending = true;
+    fireLanguageChange(language).then(() => {
+        languageChangePending = false;
+        if (isBooted()) {
+            reRenderAllUI5Elements({ languageAware: true });
+        }
+    });
+});
+const getLanguageChangePending = () => languageChangePending;
 /**
  * Returns the currently configured language, or the browser language as a fallback.
  * @public
@@ -17,7 +37,7 @@ attachConfigurationReset(() => {
  */
 const getLanguage = () => {
     if (curLanguage === undefined) {
-        curLanguage = getConfiguredLanguage();
+        curLanguage = getSharedValue("language") ?? getConfiguredLanguage();
     }
     return curLanguage;
 };
@@ -33,8 +53,11 @@ const setLanguage = async (language) => {
     if (curLanguage === language) {
         return;
     }
+    languageChangePending = true;
     curLanguage = language;
+    fireConfigChange("language", language);
     await fireLanguageChange(language);
+    languageChangePending = false;
     if (isBooted()) {
         await reRenderAllUI5Elements({ languageAware: true });
     }
@@ -72,5 +95,5 @@ const getFetchDefaultLanguage = () => {
     }
     return fetchDefaultLanguage;
 };
-export { getLanguage, setLanguage, getDefaultLanguage, setFetchDefaultLanguage, getFetchDefaultLanguage, };
+export { getLanguage, setLanguage, getDefaultLanguage, setFetchDefaultLanguage, getFetchDefaultLanguage, getLanguageChangePending, };
 //# sourceMappingURL=Language.js.map

@@ -1,4 +1,5 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type TableCell from "./TableCell.js";
 import type { ITableRow, TableColumnInfo } from "./Table.js";
@@ -31,6 +32,7 @@ type TableRowF7PressEventDetail = {
  * @public
  * @csspart row - Used to style the native `tr` element
  * @csspart popin-row - Used to style the `tr` element when a row pops in
+ * @deprecated Deprecated as of version 2.12.0, use `@ui5/webcomponents/dist/TableRow.js` instead.
  */
 declare class TableRow extends UI5Element implements ITableRow {
     eventDetails: {
@@ -89,7 +91,7 @@ declare class TableRow extends UI5Element implements ITableRow {
      * **Note:** Use `ui5-table-cell` for the intended design.
      * @public
      */
-    cells: Array<TableCell>;
+    cells: DefaultSlot<TableCell>;
     static i18nBundle: I18nBundle;
     visibleCells: Array<TableCell>;
     popinCells: Array<TableColumnInfo>;

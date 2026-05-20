@@ -8,12 +8,13 @@ var IllustratedMessage_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import ResizeHandler from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
 import { getIllustrationDataSync, getIllustrationData } from "@ui5/webcomponents-base/dist/asset-registries/Illustrations.js";
 import { getEffectiveAriaLabelText } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
+import executeTemplate from "@ui5/webcomponents-base/dist/renderer/executeTemplate.js";
 import IllustrationMessageDesign from "./types/IllustrationMessageDesign.js";
 import IllustrationMessageType from "./types/IllustrationMessageType.js";
 import "./illustrations/BeforeSearch.js";
@@ -111,6 +112,15 @@ let IllustratedMessage = IllustratedMessage_1 = class IllustratedMessage extends
         * @since 2.0.0
         */
         this.design = "Auto";
+        /**
+        * Defines whether the illustration is decorative.
+        *
+        * When set to `true`, the attributes `role="presentation"` and `aria-hidden="true"` are applied to the SVG element.
+        * @default false
+        * @public
+        * @since 2.10.0
+        */
+        this.decorative = false;
         this._handleResize = this.handleResize.bind(this);
         // this will store the last known offsetWidth of the IllustratedMessage DOM node for a given media (e.g. "Spot")
         this._lastKnownOffsetWidthForMedia = {};
@@ -155,10 +165,32 @@ let IllustratedMessage = IllustratedMessage_1 = class IllustratedMessage extends
         if (illustrationData === undefined) {
             illustrationData = await getIllustrationData(effectiveName);
         }
-        this.dotSvg = illustrationData.dotSvg;
-        this.spotSvg = illustrationData.spotSvg;
-        this.dialogSvg = illustrationData.dialogSvg;
-        this.sceneSvg = illustrationData.sceneSvg;
+        // Check if illustration uses templates (safe variant)
+        if (illustrationData && "dotTemplate" in illustrationData && illustrationData.dotTemplate) {
+            this.dotTemplate = executeTemplate(illustrationData.dotTemplate, this);
+        }
+        if (illustrationData && "spotTemplate" in illustrationData && illustrationData.spotTemplate) {
+            this.spotTemplate = executeTemplate(illustrationData.spotTemplate, this);
+        }
+        if (illustrationData && "dialogTemplate" in illustrationData && illustrationData.dialogTemplate) {
+            this.dialogTemplate = executeTemplate(illustrationData.dialogTemplate, this);
+        }
+        if (illustrationData && "sceneTemplate" in illustrationData && illustrationData.sceneTemplate) {
+            this.sceneTemplate = executeTemplate(illustrationData.sceneTemplate, this);
+        }
+        // Check if illustration uses SVG strings (unsafe variant)
+        if (illustrationData && "dotSvg" in illustrationData) {
+            this.dotSvg = illustrationData.dotSvg;
+        }
+        if (illustrationData && "spotSvg" in illustrationData) {
+            this.spotSvg = illustrationData.spotSvg;
+        }
+        if (illustrationData && "dialogSvg" in illustrationData) {
+            this.dialogSvg = illustrationData.dialogSvg;
+        }
+        if (illustrationData && "sceneSvg" in illustrationData) {
+            this.sceneSvg = illustrationData.sceneSvg;
+        }
         this.illustrationTitle = IllustratedMessage_1.i18nBundle.getText(illustrationData.title);
         this.illustrationSubtitle = IllustratedMessage_1.i18nBundle.getText(illustrationData.subtitle);
         if (this.design !== IllustrationMessageDesign.Auto) {
@@ -213,7 +245,18 @@ let IllustratedMessage = IllustratedMessage_1 = class IllustratedMessage extends
     }
     _setSVGAccAttrs() {
         const svg = this.shadowRoot.querySelector(".ui5-illustrated-message-illustration svg");
-        if (svg) {
+        if (!svg) {
+            return;
+        }
+        if (this.decorative) {
+            svg.setAttribute("role", "presentation");
+            svg.setAttribute("aria-hidden", "true");
+            svg.removeAttribute("aria-label");
+        }
+        else {
+            svg.removeAttribute("role");
+            svg.removeAttribute("aria-hidden");
+            // Set aria-label only when not decorative and text exists
             if (this.ariaLabelText) {
                 svg.setAttribute("aria-label", this.ariaLabelText);
             }
@@ -255,6 +298,15 @@ let IllustratedMessage = IllustratedMessage_1 = class IllustratedMessage extends
             case IllustrationMessageDesign.Dialog:
                 this.media = IllustratedMessage_1.MEDIA.DIALOG;
                 return;
+            case IllustrationMessageDesign.ExtraSmall:
+                this.media = IllustratedMessage_1.MEDIA.DOT;
+                return;
+            case IllustrationMessageDesign.Small:
+                this.media = IllustratedMessage_1.MEDIA.SPOT;
+                return;
+            case IllustrationMessageDesign.Medium:
+                this.media = IllustratedMessage_1.MEDIA.DIALOG;
+                return;
             default:
                 this.media = IllustratedMessage_1.MEDIA.SCENE;
         }
@@ -265,13 +317,13 @@ let IllustratedMessage = IllustratedMessage_1 = class IllustratedMessage extends
     get effectiveIllustration() {
         switch (this.media) {
             case IllustratedMessage_1.MEDIA.DOT:
-                return this.dotSvg;
+                return this.dotTemplate || this.dotSvg;
             case IllustratedMessage_1.MEDIA.SPOT:
-                return this.spotSvg;
+                return this.spotTemplate || this.spotSvg;
             case IllustratedMessage_1.MEDIA.DIALOG:
-                return this.dialogSvg;
+                return this.dialogTemplate || this.dialogSvg;
             case IllustratedMessage_1.MEDIA.SCENE:
-                return this.sceneSvg;
+                return this.sceneTemplate || this.sceneSvg;
             default:
                 return "";
         }
@@ -330,8 +382,23 @@ __decorate([
     property({ noAttribute: true })
 ], IllustratedMessage.prototype, "dialogSvg", void 0);
 __decorate([
+    property({ noAttribute: true })
+], IllustratedMessage.prototype, "dotTemplate", void 0);
+__decorate([
+    property({ noAttribute: true })
+], IllustratedMessage.prototype, "spotTemplate", void 0);
+__decorate([
+    property({ noAttribute: true })
+], IllustratedMessage.prototype, "sceneTemplate", void 0);
+__decorate([
+    property({ noAttribute: true })
+], IllustratedMessage.prototype, "dialogTemplate", void 0);
+__decorate([
     property()
 ], IllustratedMessage.prototype, "media", void 0);
+__decorate([
+    property({ type: Boolean })
+], IllustratedMessage.prototype, "decorative", void 0);
 __decorate([
     slot({ type: HTMLElement })
 ], IllustratedMessage.prototype, "title", void 0);

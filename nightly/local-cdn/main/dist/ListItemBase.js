@@ -91,10 +91,10 @@ let ListItemBase = class ListItemBase extends UI5Element {
         if (this.getFocusDomRef().matches(":has(:focus-within)")) {
             return;
         }
-        if (isSpace(e)) {
+        if (this._isSpace(e)) {
             e.preventDefault();
         }
-        if (isEnter(e)) {
+        if (this._isEnter(e)) {
             this.fireItemPress(e);
         }
     }
@@ -102,15 +102,59 @@ let ListItemBase = class ListItemBase extends UI5Element {
         if (this.getFocusDomRef().matches(":has(:focus-within)")) {
             return;
         }
-        if (isSpace(e)) {
+        if (this._isSpace(e)) {
             this.fireItemPress(e);
         }
     }
     _onclick(e) {
-        if (this.getFocusDomRef().matches(":has(:focus-within)")) {
+        if (this.getFocusDomRef().matches(":has(:focus-within)") || this._isDisabledInteractiveContentClicked(e)) {
             return;
         }
+        e.stopPropagation();
         this.fireItemPress(e);
+    }
+    _isDisabledInteractiveContentClicked(e) {
+        const path = e.composedPath();
+        const focusDomRef = this.getFocusDomRef();
+        return path.some(target => {
+            if (!(target instanceof HTMLElement)) {
+                return false;
+            }
+            if (target === this || target === focusDomRef) {
+                return false;
+            }
+            if (!this._isNativeInteractiveElement(target) && !this._isCustomInteractiveElement(target)) {
+                return false;
+            }
+            return this._isElementDisabled(target);
+        });
+    }
+    _isNativeInteractiveElement(target) {
+        return target.matches("button, input, select, textarea");
+    }
+    _isCustomInteractiveElement(target) {
+        const targetWithDisabled = target;
+        return target.tagName.includes("-")
+            && ("disabled" in targetWithDisabled || target.hasAttribute("aria-disabled"));
+    }
+    _isElementDisabled(target) {
+        const targetWithDisabled = target;
+        if (typeof targetWithDisabled.disabled === "boolean") {
+            return targetWithDisabled.disabled;
+        }
+        return target.getAttribute("aria-disabled") === "true";
+    }
+    /**
+     * Override from subcomponent, if needed
+     */
+    _isSpace(e) {
+        return isSpace(e);
+    }
+    /**
+     * Override from subcomponent, if needed
+     */
+    _isEnter(e) {
+        return isEnter(e);
     }
     fireItemPress(e) {
         if (this.disabled || !this._pressable) {
@@ -119,6 +163,7 @@ let ListItemBase = class ListItemBase extends UI5Element {
         if (isEnter(e)) {
             e.preventDefault();
         }
+        this.fireDecoratorEvent("click", { item: this, originalEvent: e });
         this.fireDecoratorEvent("_press", { item: this, selected: this.selected, key: e.key });
     }
     _handleTabNext(e) {
@@ -131,7 +176,9 @@ let ListItemBase = class ListItemBase extends UI5Element {
     _handleTabPrevious(e) {
         const target = e.target;
         if (this.shouldForwardTabBefore(target)) {
-            this.fireDecoratorEvent("forward-before");
+            if (!this.fireDecoratorEvent("forward-before")) {
+                e.preventDefault();
+            }
         }
     }
     /**
@@ -177,6 +224,9 @@ let ListItemBase = class ListItemBase extends UI5Element {
         }
         return this.forcedTabIndex ? parseInt(this.forcedTabIndex) : undefined;
     }
+    get isListItemBase() {
+        return true;
+    }
 };
 __decorate([
     property({ type: Boolean })
@@ -203,6 +253,20 @@ ListItemBase = __decorate([
     customElement({
         renderer: jsxRenderer,
         styles: [styles, draggableElementStyles],
+    })
+    /**
+     * Fired when the component is activated either with a mouse/tap or by using the Enter or Space key.
+     *
+     * **Note:** The event will not be fired if the `disabled` property is set to `true`.
+     *
+     * @since 2.22.0
+     * @public
+     * @param {ListItemBase} item The activated item.
+     * @param {Event} originalEvent The original event from the user interaction.
+     */
+    ,
+    event("click", {
+        bubbles: true,
     }),
     event("request-tabindex-change", {
         bubbles: true,
@@ -219,6 +283,7 @@ ListItemBase = __decorate([
     }),
     event("forward-before", {
         bubbles: true,
+        cancelable: true,
     })
 ], ListItemBase);
 export default ListItemBase;

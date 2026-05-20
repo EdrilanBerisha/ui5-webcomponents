@@ -1,11 +1,10 @@
-const isInstanceOfTable = (obj) => {
-    return !!obj && "isTable" in obj && !!obj.isTable;
+import createInstanceChecker from "@ui5/webcomponents-base/dist/util/createInstanceChecker.js";
+const isInstanceOfTable = createInstanceChecker("isTable");
+const isSelectionCell = (e) => {
+    return e.composedPath().some((el) => el.hasAttribute?.("data-ui5-table-selection-cell"));
 };
-const isSelectionCheckbox = (e) => {
-    return e.composedPath().some((el) => el.hasAttribute?.("data-ui5-table-selection-component"));
-};
-const isHeaderSelector = (e) => {
-    return isSelectionCheckbox(e) && e.composedPath().some((el) => el instanceof HTMLElement && el.hasAttribute("ui5-table-header-row"));
+const isHeaderSelectionCell = (e) => {
+    return isSelectionCell(e) && e.composedPath().some((el) => el instanceof HTMLElement && el.hasAttribute("ui5-table-header-row"));
 };
 const findRowInPath = (composedPath) => {
     return composedPath.find((el) => el instanceof HTMLElement && el.hasAttribute("ui5-table-row"));
@@ -83,5 +82,16 @@ const toggleAttribute = (element, attribute, condition, value) => {
         element.removeAttribute(attribute);
     }
 };
-export { isInstanceOfTable, isSelectionCheckbox, isHeaderSelector, findRowInPath, findVerticalScrollContainer, scrollElementIntoView, isFeature, throttle, toggleAttribute, };
+/**
+ * Checks if a given width is valid for a column.
+ *
+ * @param width Width string to check
+ * @returns {boolean} true if the width is valid, false otherwise
+ */
+const isValidColumnWidth = (width) => {
+    const element = document.createElement("div");
+    element.style.width = `max(3rem, ${width})`;
+    return element.style.width !== "";
+};
+export { isInstanceOfTable, isSelectionCell, isHeaderSelectionCell, findRowInPath, findVerticalScrollContainer, scrollElementIntoView, isFeature, throttle, toggleAttribute, isValidColumnWidth, };
 //# sourceMappingURL=TableUtils.js.map

@@ -7,12 +7,11 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var Wizard_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
-import getEffectiveScrollbarStyle from "@ui5/webcomponents-base/dist/util/getEffectiveScrollbarStyle.js";
 import ItemNavigation from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
 import NavigationMode from "@ui5/webcomponents-base/dist/types/NavigationMode.js";
 import clamp from "@ui5/webcomponents-base/dist/util/clamp.js";
@@ -21,7 +20,7 @@ import debounce from "@ui5/webcomponents-base/dist/util/debounce.js";
 import { getFirstFocusableElement } from "@ui5/webcomponents-base/dist/util/FocusableElements.js";
 import "./WizardStep.js";
 // Texts
-import { WIZARD_NAV_STEP_DEFAULT_HEADING, WIZARD_NAV_ARIA_ROLE_DESCRIPTION, WIZARD_NAV_ARIA_LABEL, WIZARD_LIST_ARIA_LABEL, WIZARD_LIST_ARIA_DESCRIBEDBY, WIZARD_ACTIONSHEET_STEPS_ARIA_LABEL, WIZARD_OPTIONAL_STEP_ARIA_LABEL, WIZARD_STEP_ARIA_LABEL, WIZARD_STEP_ACTIVE, WIZARD_STEP_INACTIVE, } from "./generated/i18n/i18n-defaults.js";
+import { WIZARD_NAV_STEP_DEFAULT_HEADING, WIZARD_NAV_ARIA_ROLE_DESCRIPTION, WIZARD_NAV_ARIA_LABEL, WIZARD_LIST_ARIA_LABEL, WIZARD_LIST_ARIA_DESCRIBEDBY, WIZARD_ACTIONSHEET_STEPS_ARIA_LABEL, WIZARD_OPTIONAL_STEP_ARIA_LABEL, WIZARD_STEP_ARIA_LABEL, WIZARD_STEP_ACTIVE, WIZARD_STEP_INACTIVE, WIZARD_CANCEL_BUTTON, } from "./generated/i18n/i18n-defaults.js";
 // Template and Styles
 import WizardTemplate from "./WizardTemplate.js";
 import WizardCss from "./generated/themes/Wizard.css.js";
@@ -188,6 +187,7 @@ let Wizard = Wizard_1 = class Wizard extends UI5Element {
         this.storeStepScrollOffsets();
         if (this.previouslySelectedStepIndex !== this.selectedStepIndex) {
             this.scrollToSelectedStep();
+            this.focusFirstElementInCurrentStep();
         }
         this.attachStepsResizeObserver();
         this.previouslySelectedStepIndex = this.selectedStepIndex;
@@ -505,6 +505,9 @@ let Wizard = Wizard_1 = class Wizard extends UI5Element {
         });
         return contentHeight;
     }
+    getFocusDomRef() {
+        return this._itemNavigation._getCurrentItem();
+    }
     getStepAriaLabelText(step, ariaLabel) {
         return Wizard_1.i18nBundle.getText(WIZARD_STEP_ARIA_LABEL, ariaLabel);
     }
@@ -591,6 +594,9 @@ let Wizard = Wizard_1 = class Wizard extends UI5Element {
     }
     get ariaLabelText() {
         return Wizard_1.i18nBundle.getText(WIZARD_NAV_ARIA_ROLE_DESCRIPTION);
+    }
+    get _dialogCancelButtonText() {
+        return Wizard_1.i18nBundle.getText(WIZARD_CANCEL_BUTTON);
     }
     get effectiveStepSwitchThreshold() {
         return clamp(this.stepSwitchThreshold, STEP_SWITCH_THRESHOLDS.MIN, STEP_SWITCH_THRESHOLDS.MAX);
@@ -681,6 +687,22 @@ let Wizard = Wizard_1 = class Wizard extends UI5Element {
             this.scrollToContentItem(this.selectedStepIndex);
         }
         this.selectionRequestedByScroll = false;
+    }
+    /**
+     * Focuses the first focusable element in the currently selected step.
+     * This helps screen readers announce the step change.
+     * @private
+     */
+    async focusFirstElementInCurrentStep() {
+        const currentStep = this.slottedSteps[this.selectedStepIndex];
+        if (!currentStep || currentStep.disabled) {
+            return;
+        }
+        const firstElementChild = currentStep.firstElementChild;
+        const firstFocusableElement = await getFirstFocusableElement(firstElementChild);
+        if (firstFocusableElement) {
+            firstFocusableElement.focus();
+        }
     }
     /**
      * Scrolls to the content item within the `ui5-wizard` shadowDOM
@@ -779,7 +801,7 @@ __decorate([
     property({ type: Number })
 ], Wizard.prototype, "contentHeight", void 0);
 __decorate([
-    property({ type: Array })
+    property({ type: Array, noAttribute: true })
 ], Wizard.prototype, "_groupedTabs", void 0);
 __decorate([
     slot({
@@ -801,7 +823,6 @@ Wizard = Wizard_1 = __decorate([
         styles: [
             WizardCss,
             WizardPopoverCss,
-            getEffectiveScrollbarStyle(),
         ],
         template: WizardTemplate,
     })

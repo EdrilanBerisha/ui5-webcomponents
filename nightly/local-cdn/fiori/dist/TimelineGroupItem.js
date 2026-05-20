@@ -7,7 +7,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import TimelineGroupItemTemplate from "./TimelineGroupItemTemplate.js";
@@ -68,6 +68,9 @@ let TimelineGroupItem = class TimelineGroupItem extends UI5Element {
         if (!this.items.length) {
             return;
         }
+        this.items.forEach(item => {
+            item.effectiveRole = "treeitem";
+        });
         this._setGroupItemProps();
     }
     _setGroupItemProps() {

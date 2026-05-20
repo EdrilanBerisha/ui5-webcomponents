@@ -36,13 +36,28 @@ declare class DateComponentBase extends UI5Element {
     /**
      * Determines the format, displayed in the input field.
      * @default undefined
+     * @deprecated Use displayFormat and valueFormat instead
      * @public
      */
     formatPattern?: string;
     /**
+     * Determines the format, displayed in the input field.
+     * @default undefined
+     * @since 2.14.0
+     * @public
+     */
+    displayFormat?: string;
+    /**
+     * Determines the format, used for the value attribute.
+     * @default undefined
+     * @since 2.14.0
+     * @public
+     */
+    valueFormat?: string;
+    /**
      * Determines the minimum date available for selection.
      *
-     * **Note:** If the formatPattern property is not set, the minDate value must be provided in the ISO date format (YYYY-MM-dd).
+     * **Note:** If the formatPattern property is not set, the minDate value must be provided in the ISO date format (yyyy-MM-dd).
      * @default ""
      * @since 1.0.0-rc.6
      * @public
@@ -51,7 +66,7 @@ declare class DateComponentBase extends UI5Element {
     /**
      * Determines the maximum date available for selection.
      *
-     * **Note:** If the formatPattern property is not set, the maxDate value must be provided in the ISO date format (YYYY-MM-dd).
+     * **Note:** If the formatPattern property is not set, the maxDate value must be provided in the ISO date format (yyyy-MM-dd).
      * @default ""
      * @since 1.0.0-rc.6
      * @public
@@ -67,7 +82,7 @@ declare class DateComponentBase extends UI5Element {
     calendarWeekNumbering: `${CalendarWeekNumbering}`;
     static i18nBundle?: I18nBundle;
     /**
-     * Cached instance of DateFormat with a format pattern of "YYYY-MM-dd".
+     * Cached instance of DateFormat with a format pattern of "yyyy-MM-dd".
      * Used by the getISOFormat method to avoid creating a new DateFormat instance on each call.
      * @private
      */
@@ -77,14 +92,24 @@ declare class DateComponentBase extends UI5Element {
     get _secondaryCalendarType(): CalendarType | "Gregorian" | "Islamic" | "Japanese" | "Buddhist" | "Persian" | undefined;
     get _minDate(): CalendarDate;
     get _maxDate(): CalendarDate;
-    get _formatPattern(): string;
+    get _formatPattern(): string | undefined;
     get _isPattern(): boolean;
+    get _isValueFormatPattern(): boolean;
+    get _isDisplayFormatPattern(): boolean;
+    get initialFocusId(): string;
     get hasSecondaryCalendarType(): boolean;
     _getMinMaxCalendarDateFromString(date: string): CalendarDate | undefined;
     _getCalendarDateFromString(value: string): CalendarDate | undefined;
+    _getCalendarDateFromStringDisplayValue(value: string): CalendarDate | undefined;
     _getTimeStampFromString(value: string): number | undefined;
     _getStringFromTimestamp(timestamp: number): string;
-    getFormat(): import("sap/ui/core/format/DateFormat").default;
+    _getDisplayStringFromTimestamp(timestamp: number): string;
+    _getValueStringFromTimestamp(timestamp: number): string;
+    getFormat(): DateFormat;
+    get _displayFormat(): string | undefined;
+    get _valueFormat(): string;
+    getDisplayFormat(): DateFormat;
+    getValueFormat(): DateFormat;
     getISOFormat(): DateFormat;
 }
 export default DateComponentBase;

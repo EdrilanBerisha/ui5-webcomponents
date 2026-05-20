@@ -25,6 +25,7 @@ const importMessageBundle = async (localeId) => {
         case "hi": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-hi" */ "../assets/i18n/messagebundle_hi.json")).default;
         case "hr": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-hr" */ "../assets/i18n/messagebundle_hr.json")).default;
         case "hu": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-hu" */ "../assets/i18n/messagebundle_hu.json")).default;
+        case "id": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-id" */ "../assets/i18n/messagebundle_id.json")).default;
         case "it": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-it" */ "../assets/i18n/messagebundle_it.json")).default;
         case "iw": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-iw" */ "../assets/i18n/messagebundle_iw.json")).default;
         case "ja": return (await import(/* webpackChunkName: "ui5-webcomponents-ai-messagebundle-ja" */ "../assets/i18n/messagebundle_ja.json")).default;
@@ -85,6 +86,7 @@ const localeIds = ["ar",
     "hi",
     "hr",
     "hu",
+    "id",
     "it",
     "iw",
     "ja",
@@ -113,6 +115,6 @@ const localeIds = ["ar",
     "zh_CN",
     "zh_TW",];
 localeIds.forEach(localeId => {
-    registerI18nLoader("@ui5/webcomponents-ai", localeId, importAndCheck);
+    registerI18nLoader("@" + "u" + "i" + "5" + "/" + "w" + "e" + "b" + "c" + "o" + "m" + "p" + "o" + "n" + "e" + "n" + "t" + "s" + "-" + "a" + "i", localeId, importAndCheck);
 });
 //# sourceMappingURL=i18n.js.map

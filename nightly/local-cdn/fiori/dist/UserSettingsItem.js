@@ -6,8 +6,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
-import { customElement, property, slot, eventStrict as event, } from "@ui5/webcomponents-base/dist/decorators.js";
-import getEffectiveScrollbarStyle from "@ui5/webcomponents-base/dist/util/getEffectiveScrollbarStyle.js";
+import { customElement, property, slotStrict as slot, eventStrict as event, } from "@ui5/webcomponents-base/dist/decorators.js";
 import UserSettingsItemTemplate from "./UserSettingsItemTemplate.js";
 import UserSettingsItemCss from "./generated/themes/UserSettingsItem.css.js";
 /**
@@ -26,7 +25,6 @@ import UserSettingsItemCss from "./generated/themes/UserSettingsItem.css.js";
  *
  * @constructor
  * @extends UI5Element
- * @experimental
  * @public
  * @since 2.8.0
  */
@@ -76,6 +74,10 @@ let UserSettingsItem = class UserSettingsItem extends UI5Element {
          * @public
          */
         this.icon = "globe";
+        /**
+         * Indicates whether any of the element siblings have icon.
+         */
+        this._siblingsWithIcon = false;
     }
     get _hasSelectedPageView() {
         return this.pages.some(view => view.selected);
@@ -84,7 +86,7 @@ let UserSettingsItem = class UserSettingsItem extends UI5Element {
         return this.pages.find(view => view.selected) || this.pages[0];
     }
     get ariaLabelledByText() {
-        return `${this.text} ${this.accessibleName}`.trim();
+        return `${this.text} ${this.accessibleName || ""}`.trim();
     }
     get _tooltip() {
         return this.tooltip ? this.tooltip : this.text;
@@ -168,7 +170,7 @@ __decorate([
             slots: false,
         },
     })
-], UserSettingsItem.prototype, "tabs", void 0);
+], UserSettingsItem.prototype, "pages", void 0);
 __decorate([
     slot({
         type: HTMLElement,
@@ -178,13 +180,16 @@ __decorate([
             slots: false,
         },
     })
-], UserSettingsItem.prototype, "pages", void 0);
+], UserSettingsItem.prototype, "tabs", void 0);
+__decorate([
+    property({ type: Boolean, noAttribute: true })
+], UserSettingsItem.prototype, "_siblingsWithIcon", void 0);
 UserSettingsItem = __decorate([
     customElement({
         tag: "ui5-user-settings-item",
         renderer: jsxRenderer,
         template: UserSettingsItemTemplate,
-        styles: [getEffectiveScrollbarStyle(), UserSettingsItemCss],
+        styles: [UserSettingsItemCss],
     })
     /**
      * Fired when a selected view changed.

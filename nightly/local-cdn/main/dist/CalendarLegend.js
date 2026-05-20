@@ -9,7 +9,7 @@ import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import ItemNavigation from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
@@ -78,6 +78,9 @@ let CalendarLegend = CalendarLegend_1 = class CalendarLegend extends UI5Element 
             const focusableItemIndex = this._lastFocusedItemIndex !== null ? this._lastFocusedItemIndex : 0;
             this._itemNavigation.setCurrentItem(this.focusableElements[focusableItemIndex]);
         }
+    }
+    getFocusDomRef() {
+        return this._itemNavigation._getCurrentItem();
     }
     _onMouseDown(e) {
         e.stopPropagation();

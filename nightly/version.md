@@ -1,5 +1,5 @@
-commit d3580adacf83d7fa636927f6e6c3b0d20df50d27
-Author: Dobromira Boycheva <dobromira.boycheva@sap.com>
-Date:   Mon Mar 24 22:44:24 2025 +0200
+commit 12cf7aae0ed0ec4ee076fd01547d1da068c99f27
+Author: Edrilan Berisha <edi91@gmx.net>
+Date:   Tue May 19 17:46:19 2026 +0200
 
-    feat(ui5-user-menu): design enhancements (#11166)
+    Merge branch 'main' into main

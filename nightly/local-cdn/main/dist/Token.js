@@ -5,16 +5,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 var Token_1;
-// eslint-disable-next-line max-classes-per-file
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import { isBackSpace, isSpace, isDelete, isSpaceCtrl, } from "@ui5/webcomponents-base/dist/Keys.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { TOKEN_ARIA_DELETABLE, TOKEN_ARIA_LABEL } from "./generated/i18n/i18n-defaults.js";
+import { TOKEN_ARIA_DELETE, TOKEN_ARIA_DELETABLE, TOKEN_ARIA_LABEL } from "./generated/i18n/i18n-defaults.js";
 import TokenTemplate from "./TokenTemplate.js";
 // Styles
 import tokenStyles from "./generated/themes/Token.css.js";
@@ -73,6 +72,12 @@ let Token = Token_1 = class Token extends UI5Element {
          */
         this.toBeDeleted = false;
         /**
+         * Set by the tokenizer to mark the last visible token before overflow.
+         * @default false
+         * @private
+         */
+        this.lastVisibleToken = false;
+        /**
          * Defines the tabIndex of the component.
          * @private
          */
@@ -118,12 +123,8 @@ let Token = Token_1 = class Token extends UI5Element {
             this._handleSelect();
         }
     }
-    onBeforeRendering() {
-        this.toBeDeleted = false;
-        // this.fireMyEvent("select");
-    }
     get tokenDeletableText() {
-        return Token_1.i18nBundle.getText(TOKEN_ARIA_DELETABLE);
+        return Token_1.i18nBundle.getText(TOKEN_ARIA_DELETE);
     }
     get textDom() {
         return this.getDomRef()?.querySelector(".ui5-token--text");
@@ -163,6 +164,9 @@ __decorate([
 __decorate([
     property({ type: Boolean })
 ], Token.prototype, "toBeDeleted", void 0);
+__decorate([
+    property({ type: Boolean })
+], Token.prototype, "lastVisibleToken", void 0);
 __decorate([
     property({ noAttribute: true })
 ], Token.prototype, "forcedTabIndex", void 0);

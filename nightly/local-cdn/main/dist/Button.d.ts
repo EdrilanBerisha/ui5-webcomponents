@@ -1,11 +1,12 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type { AccessibilityAttributes, AriaRole } from "@ui5/webcomponents-base";
 import type { ITabbable } from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { I18nText } from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import ButtonDesign from "./types/ButtonDesign.js";
 import ButtonType from "./types/ButtonType.js";
-import type ButtonAccessibleRole from "./types/ButtonAccessibleRole.js";
+import ButtonAccessibleRole from "./types/ButtonAccessibleRole.js";
 import type ButtonBadge from "./ButtonBadge.js";
 /**
  * Interface for components that may be used as a button inside numerous higher-order components
@@ -14,7 +15,14 @@ import type ButtonBadge from "./ButtonBadge.js";
 interface IButton extends HTMLElement, ITabbable {
     nonInteractive: boolean;
 }
-type ButtonAccessibilityAttributes = Pick<AccessibilityAttributes, "expanded" | "hasPopup" | "controls">;
+type ButtonAccessibilityAttributes = Pick<AccessibilityAttributes, "expanded" | "hasPopup" | "controls" | "ariaKeyShortcuts" | "ariaLabel">;
+type ButtonClickEventDetail = {
+    originalEvent: MouseEvent;
+    altKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    shiftKey: boolean;
+};
 /**
  * @class
  *
@@ -50,6 +58,7 @@ type ButtonAccessibilityAttributes = Pick<AccessibilityAttributes, "expanded" | 
  */
 declare class Button extends UI5Element implements IButton {
     eventDetails: {
+        "click": ButtonClickEventDetail;
         "active-state-change": void;
     };
     /**
@@ -101,6 +110,17 @@ declare class Button extends UI5Element implements IButton {
      */
     submits: boolean;
     /**
+     * Associates the button with a form element by the form's `id` attribute.
+     * When set, the button can submit or reset the specified form even if the button
+     * is not a descendant of that form.
+     *
+     * **Note:** This property takes effect only when the button's "type" property is set to "Submit" or "Reset".
+     * @default undefined
+     * @public
+     * @since 2.21.0
+     */
+    form?: string;
+    /**
      * Defines the tooltip of the component.
      *
      * **Note:** A tooltip attribute should be provided for icon-only buttons, in order to represent their exact meaning/function.
@@ -132,6 +152,11 @@ declare class Button extends UI5Element implements IButton {
      *
      * - **hasPopup**: Indicates the availability and type of interactive popup element, such as menu or dialog, that can be triggered by the button.
      * Accepts the following string values: `dialog`, `grid`, `listbox`, `menu` or `tree`.
+     *
+     * - **ariaLabel**: Defines the accessible ARIA name of the component.
+     * Accepts any string value.
+     *
+     *  - **ariaKeyShortcuts**: Defines keyboard shortcuts that activate or give focus to the button.
      *
      * - **controls**: Identifies the element (or elements) whose contents or presence are controlled by the button element.
      * Accepts a lowercase string value.
@@ -193,7 +218,24 @@ declare class Button extends UI5Element implements IButton {
      */
     nonInteractive: boolean;
     /**
-     * The current title of the button, either the tooltip property or the icons tooltip. The tooltip property with higher prio.
+     * Defines whether the button shows a loading indicator.
+     *
+     * **Note:** If set to `true`, a busy indicator component will be displayed on the related button.
+     * @default false
+     * @public
+     * @since 2.13.0
+     */
+    loading: boolean;
+    /**
+     * Specifies the delay in milliseconds before the loading indicator appears within the associated button.
+     * @default 1000
+     * @public
+     * @since 2.13.0
+     */
+    loadingDelay: number;
+    /**
+     * The button's current title is determined by either the `tooltip` property or the icon's tooltip, with the `tooltip`
+     * property taking precedence if both are set.
      * @private
      */
     buttonTitle?: string;
@@ -212,34 +254,43 @@ declare class Button extends UI5Element implements IButton {
      */
     _isTouch: boolean;
     _cancelAction: boolean;
+    _isSpacePressed: boolean;
+    /**
+     * Constantly updated value of texts collected from the accessibleNameRef elements
+     * @private
+     */
+    _accessibleNameRefTexts?: string;
     /**
      * Defines the text of the component.
      *
      * **Note:** Although this slot accepts HTML Elements, it is strongly recommended that you only use text in order to preserve the intended design.
      * @public
      */
-    text: Array<Node>;
+    text: DefaultSlot<Node>;
     /**
      * Adds a badge to the button.
      * @since 2.7.0
      * @public
      */
-    badge: Array<ButtonBadge>;
+    badge: Slot<ButtonBadge>;
     _deactivate: () => void;
+    _onclickBound: (e: MouseEvent) => void;
+    _clickHandlerAttached: boolean;
     static i18nBundle: I18nBundle;
     constructor();
     _ontouchstart(): void;
     onEnterDOM(): void;
+    _updateAccessibleNameRefTexts(): void;
+    onExitDOM(): void;
     onBeforeRendering(): Promise<void>;
     _setBadgeOverlayStyle(): void;
-    _onclick(): void;
+    _onclick(e: MouseEvent): void;
     _onmousedown(): void;
     _ontouchend(e: TouchEvent): void;
     _onkeydown(e: KeyboardEvent): void;
     _onkeyup(e: KeyboardEvent): void;
     _onfocusout(): void;
     _setActiveState(active: boolean): void;
-    get _hasPopup(): import("@ui5/webcomponents-base").AriaHasPopup | undefined;
     get hasButtonType(): boolean;
     get isIconOnly(): boolean;
     static typeTextMappings(): Record<string, I18nText>;
@@ -247,13 +298,22 @@ declare class Button extends UI5Element implements IButton {
     get buttonTypeText(): string;
     get effectiveAccRole(): AriaRole;
     get tabIndexValue(): number | undefined;
-    get showIconTooltip(): boolean;
-    get ariaLabelText(): string | undefined;
-    get ariaDescribedbyText(): "ui5-button-hiddenText-type" | undefined;
+    get ariaLabelText(): string;
     get ariaDescriptionText(): string | undefined;
+    get _computedAccessibilityAttributes(): ButtonAccessibilityAttributes;
+    get accessibilityInfo(): {
+        description: string | undefined;
+        role: import("@ui5/webcomponents-base/dist/thirdparty/preact/jsx.js").JSXInternal.AriaRole;
+        disabled: boolean;
+        children: DefaultSlot<Node>;
+        type: string;
+        label: string;
+    };
+    get effectiveAccRoleTranslation(): string;
+    get effectiveBadgeDescriptionText(): string;
     get _isSubmit(): boolean;
     get _isReset(): boolean;
     get shouldRenderBadge(): boolean;
 }
 export default Button;
-export type { ButtonAccessibilityAttributes, IButton, };
+export type { ButtonAccessibilityAttributes, ButtonClickEventDetail, IButton, };

@@ -3,7 +3,7 @@ declare const getClassCopy: (klass: typeof UI5Element, constructorCallback: () =
     new (): {
         eventDetails: object;
         _jsxEvents: Omit<import("@ui5/webcomponents-base/jsx-runtime").JSX.DOMAttributes<any>, "onClose" | "onToggle" | "onChange" | "onSelect" | "onInput"> & object;
-        _jsxProps: Pick<import("@ui5/webcomponents-base/jsx-runtime").JSX.AllHTMLAttributes<HTMLElement>, "contextmenu" | "slot" | "style" | "title" | "pattern" | "dir" | "id" | "accesskey" | "autocapitalize" | "autofocus" | "autocomplete" | "contenteditable" | "class" | "draggable" | "enterkeyhint" | "hidden" | "inputmode" | "lang" | "nonce" | "part" | "exportparts" | "spellcheck" | "tabIndex" | "tabindex" | "translate" | "ref" | "inert"> & Partial<Omit<any, keyof HTMLElement>> & Partial<Omit<import("@ui5/webcomponents-base/jsx-runtime").JSX.DOMAttributes<any>, "onClose" | "onToggle" | "onChange" | "onSelect" | "onInput"> & object> & {
+        _jsxProps: Pick<import("@ui5/webcomponents-base/jsx-runtime").JSX.AllHTMLAttributes<HTMLElement>, "contextmenu" | "slot" | "style" | "title" | "pattern" | "dir" | "id" | "accesskey" | "autocapitalize" | "autofocus" | "autocomplete" | "contenteditable" | "class" | "draggable" | "enterkeyhint" | "hidden" | "inputmode" | "lang" | "nonce" | "part" | "exportparts" | "spellcheck" | "tabIndex" | "tabindex" | "translate" | "ref" | "inert" | "role"> & Partial<Omit<any, keyof HTMLElement>> & Partial<Omit<import("@ui5/webcomponents-base/jsx-runtime").JSX.DOMAttributes<any>, "onClose" | "onToggle" | "onChange" | "onSelect" | "onInput"> & object> & {
             key?: any;
         };
         __id?: string;
@@ -20,6 +20,7 @@ declare const getClassCopy: (klass: typeof UI5Element, constructorCallback: () =
             _deferredResolve?: import("../types.js").PromiseResolve;
         };
         _doNotSyncAttributes: Set<string>;
+        __shouldHydrate: boolean;
         _state: import("../UI5ElementMetadata.js").State;
         _internals: ElementInternals;
         _individualSlot?: string;
@@ -31,6 +32,7 @@ declare const getClassCopy: (klass: typeof UI5Element, constructorCallback: () =
         readonly _id: string;
         render(): object;
         connectedCallback(): Promise<void>;
+        readonly definePromise: Promise<void>;
         disconnectedCallback(): void;
         onBeforeRendering(): void;
         onAfterRendering(): void;
@@ -78,7 +80,7 @@ declare const getClassCopy: (klass: typeof UI5Element, constructorCallback: () =
         readonly isUI5Element: boolean;
         readonly isUI5AbstractElement: boolean;
         readonly classes: import("../types.js").ClassMap;
-        readonly accessibilityInfo: import("../types.js").AccessibilityInfo;
+        readonly accessibilityInfo: import("../types.js").AccessibilityInfo | undefined;
         readonly validity: ValidityState;
         readonly validationMessage: string;
         checkValidity(): boolean;
@@ -432,7 +434,7 @@ declare const getClassCopy: (klass: typeof UI5Element, constructorCallback: () =
     fetchI18nBundles(): Promise<import("../i18nBundle.js").default[]>;
     fetchCLDR(): Promise<void>;
     asyncFinished: boolean;
-    definePromise: Promise<void> | undefined;
+    _definePromise: Promise<void> | undefined;
     i18nBundleStorage: Record<string, import("../i18nBundle.js").default>;
     readonly i18nBundles: Record<string, import("../i18nBundle.js").default>;
     define(): typeof UI5Element;

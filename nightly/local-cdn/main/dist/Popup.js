@@ -8,13 +8,13 @@ var Popup_1;
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import { renderFinished } from "@ui5/webcomponents-base/dist/Render.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import jsxRender from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import { isChrome, isDesktop, isPhone, } from "@ui5/webcomponents-base/dist/Device.js";
 import { getFirstFocusableElement, getLastFocusableElement } from "@ui5/webcomponents-base/dist/util/FocusableElements.js";
-import { getEffectiveAriaLabelText } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
+import { registerUI5Element, getEffectiveAriaLabelText, getEffectiveAriaDescriptionText, getAllAccessibleDescriptionRefTexts, deregisterUI5Element, } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 import { hasStyle, createStyle } from "@ui5/webcomponents-base/dist/ManagedStyles.js";
 import { isEnter, isTabPrevious } from "@ui5/webcomponents-base/dist/Keys.js";
 import { getFocusedElement, isFocusedElementWithinNode } from "@ui5/webcomponents-base/dist/util/PopupUtils.js";
@@ -103,6 +103,7 @@ let Popup = Popup_1 = class Popup extends UI5Element {
         this.onDesktop = false;
         this._opened = false;
         this._open = false;
+        this._resizeHandlerRegistered = false;
         this._resizeHandler = this._resize.bind(this);
         this._getRealDomRef = () => {
             return this.shadowRoot.querySelector("[root-element]");
@@ -116,14 +117,24 @@ let Popup = Popup_1 = class Popup extends UI5Element {
         renderFinished().then(() => {
             this._updateMediaRange();
         });
+        if (this.open) {
+            this._registerResizeHandler();
+        }
+        else {
+            this._deregisterResizeHandler();
+        }
     }
     onEnterDOM() {
         this.setAttribute("popover", "manual");
-        ResizeHandler.register(this, this._resizeHandler);
         if (isDesktop()) {
             this.setAttribute("desktop", "");
         }
         this.tabIndex = -1;
+        this.handleOpenOnEnterDOM();
+        this.setAttribute("data-sap-ui-fastnavgroup-container", "true");
+        registerUI5Element(this, this._updateAssociatedLabelsTexts.bind(this));
+    }
+    handleOpenOnEnterDOM() {
         if (this.open) {
             this.showPopover();
             this.openPopup();
@@ -134,7 +145,9 @@ let Popup = Popup_1 = class Popup extends UI5Element {
             Popup_1.unblockPageScrolling(this);
             this._removeOpenedPopup();
         }
-        ResizeHandler.deregister(this, this._resizeHandler);
+        this._deregisterResizeHandler();
+        this._detachBrowserEvents();
+        deregisterUI5Element(this);
     }
     /**
      * Indicates if the element is open
@@ -166,6 +179,7 @@ let Popup = Popup_1 = class Popup extends UI5Element {
             this.open = false;
             return;
         }
+        this._attachBrowserEvents();
         if (this.isModal) {
             Popup_1.blockPageScrolling(this);
         }
@@ -176,6 +190,10 @@ let Popup = Popup_1 = class Popup extends UI5Element {
             this._updateMediaRange();
         }
         this._addOpenedPopup();
+        this.classList.add("ui5-popup-opening");
+        setTimeout(() => {
+            this.classList.remove("ui5-popup-opening");
+        }, 50);
         this.open = true;
         // initial focus, if focused element is statically created
         await this.applyInitialFocus();
@@ -192,6 +210,10 @@ let Popup = Popup_1 = class Popup extends UI5Element {
      */
     _preventBlockLayerFocus(e) {
         e.preventDefault();
+    }
+    _attachBrowserEvents() {
+    }
+    _detachBrowserEvents() {
     }
     /**
      * Temporarily removes scrollbars from the html element
@@ -322,6 +344,9 @@ let Popup = Popup_1 = class Popup extends UI5Element {
     _updateMediaRange() {
         this.mediaRange = MediaRange.getCurrentRange(MediaRange.RANGESETS.RANGE_4STEPS, this.getDomRef().offsetWidth);
     }
+    _updateAssociatedLabelsTexts() {
+        this._associatedDescriptionRefTexts = getAllAccessibleDescriptionRefTexts(this);
+    }
     /**
      * Adds the popup to the "opened popups registry"
      * @protected
@@ -347,6 +372,7 @@ let Popup = Popup_1 = class Popup extends UI5Element {
         }
         this.hide();
         this.open = false;
+        this._detachBrowserEvents();
         if (!preventRegistryUpdate) {
             this._removeOpenedPopup();
         }
@@ -380,6 +406,18 @@ let Popup = Popup_1 = class Popup extends UI5Element {
             this.showPopover();
         }
     }
+    _registerResizeHandler() {
+        if (!this._resizeHandlerRegistered) {
+            ResizeHandler.register(this, this._resizeHandler);
+            this._resizeHandlerRegistered = true;
+        }
+    }
+    _deregisterResizeHandler() {
+        if (this._resizeHandlerRegistered) {
+            ResizeHandler.deregister(this, this._resizeHandler);
+            this._resizeHandlerRegistered = false;
+        }
+    }
     /**
      * Sets "none" display to the popup
      * @protected
@@ -393,6 +431,20 @@ let Popup = Popup_1 = class Popup extends UI5Element {
      */
     get _ariaLabel() {
         return getEffectiveAriaLabelText(this);
+    }
+    get _accInfoAriaDescription() {
+        return this.ariaDescriptionText || "";
+    }
+    get ariaDescriptionText() {
+        return this._associatedDescriptionRefTexts || getEffectiveAriaDescriptionText(this);
+    }
+    get ariaDescriptionTextId() {
+        return this.ariaDescriptionText ? "accessibleDescription" : "";
+    }
+    get ariaDescribedByIds() {
+        return [
+            this.ariaDescriptionTextId,
+        ].filter(Boolean).join(" ");
     }
     get _root() {
         return this.shadowRoot.querySelector(".ui5-popup-root");
@@ -438,6 +490,15 @@ __decorate([
 __decorate([
     property()
 ], Popup.prototype, "accessibleRole", void 0);
+__decorate([
+    property()
+], Popup.prototype, "accessibleDescription", void 0);
+__decorate([
+    property()
+], Popup.prototype, "accessibleDescriptionRef", void 0);
+__decorate([
+    property({ noAttribute: true })
+], Popup.prototype, "_associatedDescriptionRefTexts", void 0);
 __decorate([
     property()
 ], Popup.prototype, "mediaRange", void 0);

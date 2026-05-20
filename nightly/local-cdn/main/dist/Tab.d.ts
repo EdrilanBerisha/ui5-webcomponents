@@ -1,4 +1,5 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { ITabbable } from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
 import type { AccessibilityAttributes } from "@ui5/webcomponents-base/dist/types.js";
@@ -11,6 +12,10 @@ import type { TabContainerStripInfo, TabContainerOverflowInfo, ITab } from "./Ta
 import type ListItemCustom from "./ListItemCustom.js";
 import TabInStripTemplate from "./TabInStripTemplate.js";
 import TabInOverflowTemplate from "./TabInOverflowTemplate.js";
+type TabClickEventDetail = {
+    tab: Tab;
+    originalEvent: Event;
+};
 interface TabInStrip extends HTMLElement {
     realTabReference: Tab;
 }
@@ -29,6 +34,9 @@ interface TabInOverflow extends ListItemCustom {
  * @public
  */
 declare class Tab extends UI5Element implements ITabbable, ITab {
+    eventDetails: {
+        click: TabClickEventDetail;
+    };
     /**
      * The text to be displayed for the item.
      * @default undefined
@@ -81,7 +89,8 @@ declare class Tab extends UI5Element implements ITabbable, ITab {
      * Defines if the tab is movable.
      *
      * @default false
-     * @private
+     * @public
+     * @since 2.0.0
      */
     movable: boolean;
     _isTopLevelTab: boolean;
@@ -90,14 +99,14 @@ declare class Tab extends UI5Element implements ITabbable, ITab {
      * Holds the content associated with this tab.
      * @public
      */
-    content: Array<Node>;
+    content: DefaultSlot<Node>;
     /**
      * Defines hierarchies with nested sub tabs.
      *
      * **Note:** Use `ui5-tab` and `ui5-tab-separator` for the intended design.
      * @public
      */
-    items: Array<ITab>;
+    items: Slot<ITab>;
     _isInline?: boolean;
     _forcedMixedMode?: boolean;
     _getElementInStrip?: () => HTMLElement | undefined;
@@ -168,4 +177,4 @@ declare class Tab extends UI5Element implements ITabbable, ITab {
     } | null): void;
 }
 export default Tab;
-export type { TabInStrip, TabInOverflow, };
+export type { TabInStrip, TabInOverflow, TabClickEventDetail, };

@@ -8,7 +8,7 @@ var DynamicPage_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import query from "@ui5/webcomponents-base/dist/decorators/query.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
@@ -125,12 +125,31 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
             this.dynamicPageTitle.hasSnappedTitleOnMobile = !!this.hasSnappedTitleOnMobile;
             this.dynamicPageTitle.removeAttribute("hovered");
         }
+        if (this.dynamicPageHeader) {
+            this.dynamicPageHeader._snapped = this._headerSnapped;
+        }
+    }
+    get endAreaHeight() {
+        return this.showFooter ? this.footerWrapper?.getBoundingClientRect().height || 0 : 0;
+    }
+    get scrollPaddingTop() {
+        const titleHeight = this.dynamicPageTitle?.getBoundingClientRect().height || 0;
+        const headerHeight = this.dynamicPageHeader?.getBoundingClientRect().height || 0;
+        if (this._headerSnapped) {
+            return titleHeight;
+        }
+        const fullHeight = headerHeight + titleHeight;
+        const scrollTop = this.scrollContainer?.scrollTop || 0;
+        return Math.max(titleHeight, fullHeight - scrollTop);
     }
     get dynamicPageTitle() {
         return this.querySelector("[ui5-dynamic-page-title]");
     }
     get dynamicPageHeader() {
         return this.querySelector("[ui5-dynamic-page-header]");
+    }
+    get footerWrapper() {
+        return this.shadowRoot?.querySelector(".ui5-dynamic-page-footer");
     }
     get actionsInTitle() {
         return this._headerSnapped || this.showHeaderInStickArea || this.headerPinned;
@@ -149,11 +168,6 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
     get _headerExpanded() {
         return !this._headerSnapped;
     }
-    get _accAttributesForHeaderActions() {
-        return {
-            controls: `${this._id}-header`,
-        };
-    }
     get headerTabIndex() {
         return (this._headerSnapped || this.showHeaderInStickArea) ? -1 : 0;
     }
@@ -169,6 +183,12 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
     get hasSnappedTitleOnMobile() {
         return isPhone() && this.headerSnapped && this.dynamicPageTitle?.snappedTitleOnMobile.length;
     }
+    get headerAriaLabel() {
+        return this.hasHeading ? this._headerLabel : undefined;
+    }
+    get _hidePinButton() {
+        return this.hidePinButton || isPhone();
+    }
     /**
      * Defines if the header is snapped.
      *
@@ -176,15 +196,21 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
      * @public
      */
     set headerSnapped(snapped) {
-        if (snapped !== this._headerSnapped) {
-            this._toggleHeader();
+        if (snapped === this._headerSnapped) {
+            return;
         }
+        if (!this.scrollContainer) {
+            this._headerSnapped = snapped;
+            this.showHeaderInStickArea = snapped;
+            return;
+        }
+        this._toggleHeader();
     }
     snapOnScroll() {
         debounce(() => this.snapTitleByScroll(), SCROLL_DEBOUNCE_RATE);
     }
     snapTitleByScroll() {
-        if (!this.dynamicPageTitle || !this.dynamicPageHeader || this.headerPinned) {
+        if (!this.dynamicPageTitle || !this.dynamicPageHeader || this.headerPinned || !this.scrollContainer) {
             return;
         }
         if (this.isToggled) {
@@ -211,7 +237,7 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
             // If the header is snapped and the scroll is at the top, scroll down a bit
             // to avoid ending in an endless loop of snapping and unsnapping
             requestAnimationFrame(() => {
-                if (this.scrollContainer.scrollTop === 0) {
+                if (this.scrollContainer && this.scrollContainer.scrollTop === 0) {
                     this.scrollContainer.scrollTop = SCROLL_THRESHOLD;
                 }
             });
@@ -240,7 +266,7 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
         if (this.headerPinned) {
             this.showHeaderInStickArea = true;
         }
-        else if (this.scrollContainer.scrollTop === 0) {
+        else if (this.scrollContainer && this.scrollContainer.scrollTop === 0) {
             this.showHeaderInStickArea = false;
         }
         this.fireDecoratorEvent("pin-button-toggle");
@@ -258,6 +284,9 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
         this.dynamicPageTitle.focus();
     }
     async _toggleHeader() {
+        if (!this.scrollContainer) {
+            return;
+        }
         const headerHeight = this.dynamicPageHeader?.getBoundingClientRect().height || 0;
         const currentScrollTop = this.scrollContainer.scrollTop;
         if (!this._headerSnapped && this.headerPinned) {
@@ -292,13 +321,31 @@ let DynamicPage = DynamicPage_1 = class DynamicPage extends UI5Element {
             this.scrollContainer.scrollTop = SCROLL_THRESHOLD;
         }
     }
-    async onExpandHoverIn() {
+    onExpandHoverIn() {
         this.dynamicPageTitle?.setAttribute("hovered", "");
-        await renderFinished();
     }
-    async onExpandHoverOut() {
+    onExpandHoverOut() {
         this.dynamicPageTitle?.removeAttribute("hovered");
-        await renderFinished();
+    }
+    onContentFocusIn(e) {
+        const target = e.target;
+        this.setScrollPadding({ start: this.scrollPaddingTop, end: this.endAreaHeight });
+        // textareas and similar elements appear "in view" even when partially
+        // hidden behind sticky header/footer.
+        // manual scroll brings them fully into view.
+        // another issue is that browsers do not reflect dynamic changes of scroll-padding
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+    }
+    onContentFocusOut() {
+        // Reset scroll padding when focus leaves content (e.g., moves to sticky header).
+        // The sticky header is part of the scrollable area, so keeping padding causes unwanted scroll.
+        this.setScrollPadding({ start: 0, end: 0 });
+    }
+    setScrollPadding(padding) {
+        this.scrollContainer?.style.setProperty("scroll-padding-top", `${padding.start}px`);
+        this.scrollContainer?.style.setProperty("scroll-padding-bottom", `${padding.end}px`);
     }
 };
 __decorate([

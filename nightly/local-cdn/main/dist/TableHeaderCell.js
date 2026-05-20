@@ -4,12 +4,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
-import { customElement, property, slot } from "@ui5/webcomponents-base/dist/decorators.js";
+import { customElement, property, slotStrict as slot } from "@ui5/webcomponents-base/dist/decorators.js";
 import { toggleAttribute } from "./TableUtils.js";
 import TableCellBase from "./TableCellBase.js";
 import TableHeaderCellTemplate from "./TableHeaderCellTemplate.js";
 import TableHeaderCellStyles from "./generated/themes/TableHeaderCell.css.js";
 import SortOrder from "@ui5/webcomponents-base/dist/types/SortOrder.js";
+import query from "@ui5/webcomponents-base/dist/decorators/query.js";
 /**
  * @class
  *
@@ -28,37 +29,10 @@ import SortOrder from "@ui5/webcomponents-base/dist/types/SortOrder.js";
  * @extends TableCellBase
  * @since 2.0.0
  * @public
- * @experimental This web component is available since 2.0 with an experimental flag and its API and behavior are subject to change.
  */
 let TableHeaderCell = class TableHeaderCell extends TableCellBase {
     constructor() {
         super(...arguments);
-        /**
-         * Defines the width of column.
-         *
-         * @default "auto"
-         * @public
-         */
-        this.width = "auto";
-        /**
-         * Defines the minimum width of the column.
-         *
-         * If the table is in `Popin` mode and the minimum width does not fit anymore,
-         * the column will move into the popin.
-         *
-         * **Note:** If `minWidth` has the `auto` value, the table ensures that the column is wider than at least `3rem`.
-         *
-         * @default "auto"
-         * @public
-         */
-        this.minWidth = "auto";
-        /**
-         * Defines the maximum width of the column.
-         *
-         * @default "auto"
-         * @public
-         */
-        this.maxWidth = "auto";
         /**
          * Defines the importance of the column.
          *
@@ -89,23 +63,19 @@ let TableHeaderCell = class TableHeaderCell extends TableCellBase {
          * @public
          */
         this.popinHidden = false;
-        this._popin = false;
         this.ariaRole = "columnheader";
         this._popinWidth = 0;
     }
-    onEnterDOM() {
-        super.onEnterDOM();
-        this.style.minWidth = this.minWidth;
-        this.style.maxWidth = this.maxWidth;
-        this.style.width = this.width;
-    }
     onBeforeRendering() {
         super.onBeforeRendering();
-        if (this._individualSlot) {
-            // overwrite setting of TableCellBase so that the TableHeaderCell always uses the slot variable
-            this.style.justifyContent = `var(--horizontal-align-${this._individualSlot})`;
-        }
+        this.style.textAlign = this.horizontalAlign || "";
+        this.style.justifyContent = this.horizontalAlign || "";
         toggleAttribute(this, "aria-sort", this.sortIndicator !== SortOrder.None, this.sortIndicator.toLowerCase());
+    }
+    get accessibilityInfo() {
+        return {
+            children: [this._defaultSlot, this._actionSlot],
+        };
     }
 };
 __decorate([
@@ -114,9 +84,6 @@ __decorate([
 __decorate([
     property()
 ], TableHeaderCell.prototype, "minWidth", void 0);
-__decorate([
-    property()
-], TableHeaderCell.prototype, "maxWidth", void 0);
 __decorate([
     property({ type: Number })
 ], TableHeaderCell.prototype, "importance", void 0);
@@ -133,8 +100,11 @@ __decorate([
     slot()
 ], TableHeaderCell.prototype, "action", void 0);
 __decorate([
-    property({ type: Boolean, noAttribute: true })
-], TableHeaderCell.prototype, "_popin", void 0);
+    query("slot:not([name])")
+], TableHeaderCell.prototype, "_defaultSlot", void 0);
+__decorate([
+    query("slot[name=action]")
+], TableHeaderCell.prototype, "_actionSlot", void 0);
 TableHeaderCell = __decorate([
     customElement({
         tag: "ui5-table-header-cell",

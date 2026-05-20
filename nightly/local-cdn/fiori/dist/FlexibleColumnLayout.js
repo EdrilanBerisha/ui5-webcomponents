@@ -8,7 +8,7 @@ var FlexibleColumnLayout_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
@@ -22,7 +22,7 @@ import "@ui5/webcomponents-icons/dist/vertical-grip.js";
 import { renderFinished } from "@ui5/webcomponents-base/dist/Render.js";
 import { isLeft, isRight, isLeftShift, isRightShift, isHome, isEnd, isEnter, isSpace, } from "@ui5/webcomponents-base/dist/Keys.js";
 import FCLLayout from "./types/FCLLayout.js";
-import { getLayoutsByMedia, getNextLayoutByArrowPress, } from "./fcl-utils/FCLLayout.js";
+import { getDefaultLayoutsByMedia, getNextLayoutByArrowPress, } from "./fcl-utils/FCLLayout.js";
 // Texts
 import { FCL_START_COLUMN_TXT, FCL_MIDDLE_COLUMN_TXT, FCL_END_COLUMN_TXT, FCL_START_SEPARATOR_TOOLTIP, FCL_END_SEPARATOR_TOOLTIP, } from "./generated/i18n/i18n-defaults.js";
 // Template
@@ -43,6 +43,10 @@ const COLUMN = {
     START: 0,
     MID: 1,
     END: 2,
+};
+const SEPARATOR_DEFAULT_VALUES = {
+    START: 50,
+    END: 75,
 };
 const COLUMN_MIN_WIDTH = 248;
 /**
@@ -142,6 +146,23 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         */
         this.accessibilityAttributes = {};
         /**
+        * Allows to customize the column proportions per screen size and layout.
+        * If no custom proportion provided for a specific layout, the default will be used.
+        *
+        * **Notes:**
+        *
+        * - The proportions should be given in percentages. For example ["30%", "40%", "30%"], ["70%", "30%", 0], etc.
+        * - The proportions should add up to 100%.
+        * - Hidden columns are marked as "0px", e.g. ["0px", "70%", "30%"]. Specifying 0 or "0%" for hidden columns is also valid.
+        * - If the proportions do not match the layout (e.g. if provided proportions ["70%", "30%", "0px"] for "OneColumn" layout), then the default proportions will be used instead.
+        * - Whenever the user drags the columns separator to resize the columns, the `layoutsConfiguration` object will be updated with the user-specified proportions for the given layout (and the `layout-configuration-change` event will be fired).
+        * - No custom configuration available for the phone screen size, as the default of 100% column width is always used there.
+        * @default {}
+        * @public
+        * @since 2.16.0
+        */
+        this.layoutsConfiguration = {};
+        /**
         * Defines the component width in px.
         * @default 0
         * @private
@@ -159,18 +180,19 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         * @private
         */
         this._resizing = false;
-        this._userDefinedColumnLayouts = {
-            tablet: {},
-            desktop: {},
-        };
-        this.columnResizeHandler = (e) => {
-            e.target.classList.add("ui5-fcl-column--hidden");
+        this.onColumnCollapseAnimationEnd = (e) => {
+            const columnDOM = e.target;
+            columnDOM.classList.add("ui5-fcl-column--hidden");
+            columnDOM.classList.remove("ui5-fcl-column-collapse-animation");
+            columnDOM.removeEventListener("transitionend", this.onColumnCollapseAnimationEndRef);
         };
         this._prevLayout = null;
+        this._prevLayoutsConfiguration = null;
         this.initialRendering = true;
         this._handleResize = this.handleResize.bind(this);
         this._onSeparatorMove = this.onSeparatorMove.bind(this);
         this._onSeparatorMoveEnd = this.onSeparatorMoveEnd.bind(this);
+        this.onColumnCollapseAnimationEndRef = this.onColumnCollapseAnimationEnd.bind(this);
         const handleTouchStartEvent = (e) => {
             this.onSeparatorPress(e);
         };
@@ -193,6 +215,7 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
             this.handleInitialRendering();
             return;
         }
+        this.syncLayoutsConfiguration();
         this.syncLayout();
     }
     handleInitialRendering() {
@@ -223,6 +246,14 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         if (this._prevLayout !== this.layout) {
             this.updateLayout();
             this._prevLayout = this.layout;
+        }
+    }
+    syncLayoutsConfiguration() {
+        if (this._prevLayoutsConfiguration !== this.layoutsConfiguration) {
+            this._prevLayoutsConfiguration = this.layoutsConfiguration;
+            if (this.nextColumnLayout(this.layout).join() !== this._columnLayout?.join() && !this.separatorMovementSession) {
+                this.updateLayout();
+            }
         }
     }
     toggleColumns() {
@@ -258,33 +289,180 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         }
         // hide column: 33% to 0, 25% to 0, etc .
         if (currentlyHidden) {
-            // animate the width
-            columnDOM.style.width = typeof columnWidth === "number" ? `${columnWidth}px` : columnWidth;
-            // hide column with delay to allow the animation runs entirely
-            columnDOM.addEventListener("transitionend", this.columnResizeHandler);
+            this.collapseColumn(columnDOM);
             return;
         }
         // show column: from 0 to 33%, from 0 to 25%, etc.
         if (previouslyHidden) {
-            columnDOM.removeEventListener("transitionend", this.columnResizeHandler);
-            columnDOM.classList.remove("ui5-fcl-column--hidden");
-            columnDOM.style.width = typeof columnWidth === "number" ? `${columnWidth}px` : columnWidth;
+            this.expandColumn(columnDOM, columnWidth);
+        }
+    }
+    expandColumn(columnDOM, columnWidth) {
+        columnDOM.removeEventListener("transitionend", this.onColumnCollapseAnimationEndRef);
+        columnDOM.classList.remove("ui5-fcl-column--hidden");
+        columnDOM.style.width = typeof columnWidth === "number" ? `${columnWidth}px` : columnWidth;
+    }
+    collapseColumn(columnDOM) {
+        const hasAnimation = getAnimationMode() !== AnimationMode.None && !this.initialRendering;
+        columnDOM.style.width = "0px";
+        if (hasAnimation) {
+            // hide column with delay to allow the animation runs entirely
+            columnDOM.classList.add("ui5-fcl-column-collapse-animation");
+            columnDOM.addEventListener("transitionend", this.onColumnCollapseAnimationEndRef);
+        }
+        else {
+            columnDOM.classList.add("ui5-fcl-column--hidden");
         }
     }
     nextColumnLayout(layout) {
-        let userDefinedLayout;
-        if (this.media !== MEDIA.PHONE) {
-            userDefinedLayout = this._userDefinedColumnLayouts[this.media][layout];
+        return this.getCustomColumnLayout(layout) || this.getDefaultColumnLayout(layout);
+    }
+    /**
+     * Gets custom column layout configuration if available and valid.
+     * Ensures all visible columns meet minimum width requirements.
+     * @param layout The FCL layout to get configuration for
+     * @returns Normalized column layout or undefined if invalid/unavailable
+     */
+    getCustomColumnLayout(layout) {
+        // Only allow custom configuration for tablet and desktop (not phone)
+        if (!this.mediaAllowsCustomConfiguration(this.media)) {
+            return undefined;
         }
-        return userDefinedLayout || this._effectiveLayoutsByMedia[this.media][layout].layout;
+        const customLayout = this.layoutsConfiguration[this.media]?.[layout]?.layout;
+        if (!customLayout) {
+            return undefined;
+        }
+        // ensure visible columns are above min-width given the current fcl total width
+        const constraintCompliantLayout = this.applyMinimumWidthConstraints(customLayout);
+        if (this.isValidColumnLayout(constraintCompliantLayout)) { // satisfy layout-specific contraints
+            return constraintCompliantLayout;
+        }
+    }
+    getDefaultColumnLayout(layout) {
+        return getDefaultLayoutsByMedia()[this.media][layout].layout;
+    }
+    mediaAllowsCustomConfiguration(media) {
+        return media !== MEDIA.PHONE;
+    }
+    /**
+     * Applies minimum width constraints to column layout configuration.
+     * Ensures all visible columns meet the minimum width requirement by transferring
+     * space from the wider columns to the undersized columns.
+     * @param columnLayout Original column layout (percentages or pixels)
+     * @returns Constraint-compliant column layout in same format as input
+     */
+    applyMinimumWidthConstraints(columnLayout) {
+        return this.doWithPixelConversion(columnLayout, pxWidths => {
+            return this.adjustColumnsToMinimumWidth(pxWidths);
+        });
+    }
+    /**
+     * Adjusts column widths to ensure minimum width constraints.
+     * Takes width from the widest columns to bring undersized columns up to minimum.
+     * @param pxWidths Array of column widths in pixels (modified in place)
+     */
+    adjustColumnsToMinimumWidth(pxWidths) {
+        const adjustedWidths = [...pxWidths];
+        let totalDeficit = 0;
+        for (let i = 0; i < adjustedWidths.length; i++) {
+            const width = adjustedWidths[i];
+            const isBelowMinimum = Math.ceil(width) < COLUMN_MIN_WIDTH; // ceil to avoid floating point precision issues
+            if (!this._isColumnHidden(width) && isBelowMinimum) {
+                totalDeficit += COLUMN_MIN_WIDTH - width;
+                adjustedWidths[i] = COLUMN_MIN_WIDTH;
+            }
+        }
+        if (totalDeficit === 0) {
+            return adjustedWidths; // no adjustments were needed
+        }
+        // Create proportions for redistribution of the deficit based on available space above COLUMN_MIN_WIDTH
+        const columnProportions = this.getColumnProportionsAboveMinWidth(pxWidths);
+        // Redistribute the deficit proportionally among columns that can contribute
+        for (let i = 0; i < adjustedWidths.length; i++) {
+            const isVisible = adjustedWidths[i] > 0;
+            if (isVisible && columnProportions[i] > 0) {
+                adjustedWidths[i] -= totalDeficit * columnProportions[i];
+            }
+        }
+        return adjustedWidths;
+    }
+    getColumnProportionsAboveMinWidth(columnPxWidths) {
+        const widthsAboveMinWidth = columnPxWidths.map(width => {
+            if (width > COLUMN_MIN_WIDTH) {
+                return width - COLUMN_MIN_WIDTH;
+            }
+            return 0;
+        });
+        const total = widthsAboveMinWidth.reduce((sum, width) => sum + width, 0);
+        if (total === 0) {
+            return widthsAboveMinWidth;
+        }
+        return widthsAboveMinWidth.map(width => width / total);
+    }
+    /**
+     * Helper that handles pixel conversion for column width operations.
+     * Converts input to pixels, applies the operation, then converts back to relative widths.
+     * @param columnLayout Column layout in mixed formats
+     * @param operation Function that operates on pixel widths
+     * @returns Column layout in percentage format
+     */
+    doWithPixelConversion(columnLayout, operation) {
+        // Convert to pixels for calculations
+        const pxWidths = columnLayout.map(width => this.convertColumnWidthToPixels(width));
+        // Apply the operation
+        const adjustedPxWidths = operation(pxWidths);
+        // Convert back to percentage-based widths
+        return adjustedPxWidths.map(width => this.convertToRelativeColumnWidth(width));
+    }
+    isValidColumnLayout(columnLayout) {
+        const pxWidths = columnLayout?.map(w => this.convertColumnWidthToPixels(w));
+        const totalWidth = pxWidths.reduce((sum, i) => sum + i, 0);
+        if (Math.round(totalWidth) !== Math.round(this._availableWidthForColumns)) {
+            return false;
+        }
+        return this.verifyColumnWidthsMatchLayout(pxWidths);
+    }
+    verifyColumnWidthsMatchLayout(pxWidths) {
+        const columnWidths = {
+            start: pxWidths[0],
+            mid: pxWidths[1],
+            end: pxWidths[2],
+        }, startWidth = columnWidths.start, startPercentWidth = parseInt(this.convertToRelativeColumnWidth(startWidth));
+        switch (this.layout) {
+            case FCLLayout.TwoColumnsStartExpanded: {
+                return columnWidths.start >= columnWidths.mid;
+            }
+            case FCLLayout.TwoColumnsMidExpanded: {
+                return columnWidths.mid > columnWidths.start;
+            }
+            case FCLLayout.ThreeColumnsEndExpanded: {
+                return (columnWidths.end > columnWidths.mid) && (startPercentWidth < 33);
+            }
+            case FCLLayout.ThreeColumnsStartExpandedEndHidden: {
+                return (columnWidths.start >= columnWidths.mid) && columnWidths.end === 0;
+            }
+            case FCLLayout.ThreeColumnsMidExpanded: {
+                return (columnWidths.mid >= columnWidths.end)
+                    && ((this.media === MEDIA.DESKTOP && startPercentWidth < 33) // desktop
+                        || (this.media === MEDIA.TABLET && startPercentWidth === 0)); // tablet
+            }
+            case FCLLayout.ThreeColumnsMidExpandedEndHidden: {
+                return (columnWidths.mid > columnWidths.start)
+                    && columnWidths.end === 0
+                    && ((this.media === MEDIA.DESKTOP && startPercentWidth >= 33)
+                        || (this.media === MEDIA.TABLET && startWidth >= COLUMN_MIN_WIDTH));
+            }
+        }
+        return false;
     }
     calcVisibleColumns(colLayout) {
         return colLayout.filter(colWidth => !this._isColumnHidden(colWidth)).length;
     }
     fireLayoutChange(separatorUsed, resized) {
+        const columnLayout = [...this._columnLayout]; // do not leak reference to the private _columnLayout array to prevent apps modifying its content
         this.fireDecoratorEvent("layout-change", {
             layout: this.layout,
-            columnLayout: this._columnLayout,
+            columnLayout,
             startColumnVisible: this.startColumnVisible,
             midColumnVisible: this.midColumnVisible,
             endColumnVisible: this.endColumnVisible,
@@ -292,12 +470,21 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
             resized,
         });
     }
+    fireLayoutConfigurationChange() {
+        const columnLayout = [...this._columnLayout]; // do not leak reference to the private _columnLayout array to prevent apps modifying its content
+        this.fireDecoratorEvent("layout-configuration-change", {
+            layout: this.layout,
+            media: this.media,
+            columnLayout,
+        });
+    }
     onSeparatorPress(e) {
         if (e.target === this.startArrowDOM) {
             return;
         }
         const pressedSeparator = e.target.closest(".ui5-fcl-separator");
-        if (pressedSeparator.classList.contains("ui5-fcl-separator-start") && !this.showStartSeparatorGrip) {
+        if ((pressedSeparator.classList.contains("ui5-fcl-separator-start") && !this.showStartSeparatorGrip)
+            || (pressedSeparator.classList.contains("ui5-fcl-separator-end") && !this.showEndSeparatorGrip)) {
             return;
         }
         const isTouch = supportsTouch() && e instanceof TouchEvent, cursorPositionX = this.getPageXValueFromEvent(e);
@@ -332,7 +519,7 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
             return;
         }
         const newLayout = this.separatorMovementSession.tmpFCLLayout;
-        const newColumnLayout = this._columnLayout;
+        const newColumnLayout = [...this._columnLayout]; // obtain the values only
         this.saveUserDefinedColumnLayout(newLayout, newColumnLayout);
         this.exitSeparatorMovementSession();
     }
@@ -356,11 +543,21 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         this.separatorMovementSession = null;
     }
     saveUserDefinedColumnLayout(newLayout, newColumnLayout) {
-        const media = this.media;
-        this._userDefinedColumnLayouts[media][newLayout] = newColumnLayout;
+        const oldColumnLayout = this.getCustomColumnLayout(newLayout);
         if (this.layout !== newLayout) {
             this.layout = newLayout;
             this.fireLayoutChange(true, false);
+        }
+        if (oldColumnLayout?.join() !== newColumnLayout.join()) { // compare arrays' content
+            this.updateLayoutsConfiguration(newLayout, newColumnLayout);
+            this.fireLayoutConfigurationChange();
+        }
+    }
+    updateLayoutsConfiguration(layout, columnLayout) {
+        if (this.mediaAllowsCustomConfiguration(this.media)) {
+            this.layoutsConfiguration[this.media] ??= {};
+            this.layoutsConfiguration[this.media][layout] ??= { layout: [] };
+            this.layoutsConfiguration[this.media][layout].layout = columnLayout;
         }
     }
     isSeparatorAheadOfCursor(cursorX, separatorX, isForwardMove) {
@@ -760,6 +957,22 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
     get startSeparatorArrowVisibility() {
         return this.effectiveSeparatorsInfo[0].arrowVisible;
     }
+    get startSeparatorValue() {
+        const startColumnWidth = this.startColumnWidth;
+        if (typeof startColumnWidth === "string" && startColumnWidth.endsWith("%")) {
+            return parseInt(startColumnWidth);
+        }
+        return SEPARATOR_DEFAULT_VALUES.START;
+    }
+    get endSeparatorValue() {
+        const startColumnWidth = this.startColumnWidth;
+        const midColumnWidth = this.midColumnWidth;
+        if (typeof startColumnWidth === "string" && startColumnWidth.endsWith("%")
+            && typeof midColumnWidth === "string" && midColumnWidth.endsWith("%")) {
+            return parseInt(startColumnWidth) + parseInt(midColumnWidth);
+        }
+        return SEPARATOR_DEFAULT_VALUES.END;
+    }
     get startArrowDirection() {
         return this.effectiveSeparatorsInfo[0].arrowDirection;
     }
@@ -767,7 +980,7 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         return this.shadowRoot.querySelector(".ui5-fcl-arrow--start");
     }
     get effectiveSeparatorsInfo() {
-        return this._effectiveLayoutsByMedia[this.media][this.effectiveLayout].separators;
+        return getDefaultLayoutsByMedia()[this.media][this.effectiveLayout].separators;
     }
     get effectiveLayout() {
         return this.separatorMovementSession?.tmpFCLLayout || this.layout;
@@ -787,7 +1000,6 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
         if (this.showEndSeparatorGrip) {
             return 0;
         }
-        return -1;
     }
     get media() {
         if (this._width <= BREAKPOINTS.PHONE) {
@@ -809,6 +1021,15 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
     }
     get endColumnDOM() {
         return this.shadowRoot.querySelector(".ui5-fcl-column--end");
+    }
+    get isStartColumnCollapsing() {
+        return this.startColumnDOM?.classList.contains("ui5-fcl-column-collapse-animation");
+    }
+    get isMidColumnCollapsing() {
+        return this.midColumnDOM?.classList.contains("ui5-fcl-column-collapse-animation");
+    }
+    get isEndColumnCollapsing() {
+        return this.endColumnDOM?.classList.contains("ui5-fcl-column-collapse-animation");
     }
     get accStartColumnText() {
         return this.accessibilityAttributes.startColumn?.name || FlexibleColumnLayout_1.i18nBundle.getText(FCL_START_COLUMN_TXT);
@@ -853,9 +1074,6 @@ let FlexibleColumnLayout = FlexibleColumnLayout_1 = class FlexibleColumnLayout e
     get accEndSeparatorRole() {
         return this.accessibilityAttributes.endSeparator?.role || "separator";
     }
-    get _effectiveLayoutsByMedia() {
-        return this._layoutsConfiguration || getLayoutsByMedia();
-    }
     get _accAttributes() {
         return {
             columns: {
@@ -885,10 +1103,13 @@ __decorate([
     property({ type: Object })
 ], FlexibleColumnLayout.prototype, "accessibilityAttributes", void 0);
 __decorate([
+    property({ type: Object })
+], FlexibleColumnLayout.prototype, "layoutsConfiguration", void 0);
+__decorate([
     property({ type: Number })
 ], FlexibleColumnLayout.prototype, "_width", void 0);
 __decorate([
-    property({ type: Array })
+    property({ type: Array, noAttribute: true })
 ], FlexibleColumnLayout.prototype, "_columnLayout", void 0);
 __decorate([
     property({ type: Number })
@@ -934,6 +1155,20 @@ FlexibleColumnLayout = FlexibleColumnLayout_1 = __decorate([
      */
     ,
     event("layout-change", {
+        bubbles: true,
+    })
+    /**
+     * Fired when the `layoutsConfiguration` changes via user interaction by dragging the separators.
+     *
+     * **Note:** The `layout-configuration-change` event is in an experimental state and is a subject to change.
+     * @param {FCLLayout} layout The current layout
+     * @param {MEDIA} media The current media type
+     * @param {array} columnLayout The effective column layout, f.e ["67%", "33%", "0px"]
+     * @public
+     * @since 2.16.0
+     */
+    ,
+    event("layout-configuration-change", {
         bubbles: true,
     })
 ], FlexibleColumnLayout);

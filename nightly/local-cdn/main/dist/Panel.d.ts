@@ -1,6 +1,9 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
+import type { UI5CustomEvent } from "@ui5/webcomponents-base";
 import type TitleLevel from "./types/TitleLevel.js";
+import type Button from "./Button.js";
 import type PanelAccessibleRole from "./types/PanelAccessibleRole.js";
 /**
  * @class
@@ -137,23 +140,49 @@ declare class Panel extends UI5Element {
     _hasHeader: boolean;
     _contentExpanded: boolean;
     _animationRunning: boolean;
+    _pendingToggle: boolean;
+    _touched: boolean;
+    /**
+     * Indicates whether the content area should be focusable.
+     * This is true when content is scrollable and has no focusable children.
+     * @private
+     */
+    _contentFocusable: boolean;
     /**
      * Defines the component header area.
      *
      * **Note:** When a header is provided, the `headerText` property is ignored.
      * @public
      */
-    header: Array<HTMLElement>;
+    header: Slot<HTMLElement>;
     static i18nBundle: I18nBundle;
     onBeforeRendering(): void;
+    onAfterRendering(): void;
     shouldToggle(element: HTMLElement): boolean;
     get shouldNotAnimate(): boolean;
+    _isMobile(): void;
+    _headerFocusOut(): void;
     _headerClick(e: MouseEvent): void;
-    _toggleButtonClick(e: MouseEvent): void;
+    _toggleButtonClick(e: UI5CustomEvent<Button, "click">): void;
     _headerKeyDown(e: KeyboardEvent): void;
     _headerKeyUp(e: KeyboardEvent): void;
     _toggleOpen(): void;
     _headerOnTarget(target: HTMLElement): boolean;
+    /**
+     * Updates the focusability of the content area.
+     * Content becomes focusable when:
+     * - Panel is expanded (not collapsed)
+     * - Content is scrollable (scrollHeight > clientHeight or scrollWidth > clientWidth)
+     * - No focusable children exist inside
+     * @private
+     */
+    _updateContentFocusable(): void;
+    /**
+     * Returns the tabindex for the content area.
+     * Returns 0 when content should be focusable, undefined otherwise (removes attribute).
+     * @private
+     */
+    get _contentTabIndex(): number | undefined;
     get toggleButtonTitle(): string;
     get expanded(): boolean;
     get accRole(): Lowercase<PanelAccessibleRole>;

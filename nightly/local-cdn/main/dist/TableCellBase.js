@@ -5,8 +5,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
-import { customElement, slot, property, i18n, } from "@ui5/webcomponents-base/dist/decorators.js";
-import { toggleAttribute } from "./TableUtils.js";
+import { customElement, slotStrict as slot, property, i18n, } from "@ui5/webcomponents-base/dist/decorators.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import TableCellBaseStyles from "./generated/themes/TableCellBase.css.js";
 /**
@@ -26,10 +25,8 @@ let TableCellBase = class TableCellBase extends UI5Element {
         this.ariaRole = "gridcell";
     }
     onEnterDOM() {
+        !this.role && this.setAttribute("role", this.ariaRole);
         this.toggleAttribute("ui5-table-cell-base", true);
-    }
-    onBeforeRendering() {
-        toggleAttribute(this, "role", !this._popin, this.ariaRole);
     }
     getFocusDomRef() {
         return this;

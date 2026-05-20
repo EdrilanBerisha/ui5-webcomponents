@@ -8,8 +8,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 	<meta charset="utf-8">
 
-  <script type="module" crossorigin src="/ui5-webcomponents/nightly/assets/bundle.esm-BjSpMYlu.js"></script>
-  <link rel="stylesheet" crossorigin href="/ui5-webcomponents/nightly/assets/Timeline-CfrlPcdf.css">
+  <script type="module" crossorigin src="/webcomponents/nightly/assets/bundle.esm-8souGMAV.js"></script>
+  <link rel="stylesheet" crossorigin href="/webcomponents/nightly/assets/Timeline-CfrlPcdf.css">
 </head>
 
 <body class="timeline1auto">
@@ -27,7 +27,9 @@
 					</ui5-card-header>
 					<ui5-timeline layout="Vertical" accessible-name="vertical" id="timelineAccName">
 						<ui5-timeline-item title-text="called" subtitle-text="20.02.2017 11:30" icon="phone"
-							name="Stanislava Baltova" name-clickable></ui5-timeline-item>
+							name="Stanislava Baltova" name-clickable>
+							 <ui5-input value="Input"></ui5-input>
+						</ui5-timeline-item>
 						<ui5-timeline-item title-text="called" subtitle-text="20.02.2017 11:30" icon="phone"
 							name="Stanislava Baltova"></ui5-timeline-item>
 						<ui5-timeline-item title-text="Weekly Sync - CP Design"
@@ -300,7 +302,7 @@
 
 		<section>
 			<h2>Advanced Timeline - Horizontal With Groups and Diverse Components</h2>
-			<div style="max-height: 10.5rem; overflow: auto;">
+			<div>
 				<ui5-timeline layout="Vertical" id="horizontalWithGroupsGrowing">
 					<ui5-timeline-group-item group-name="SAP Events">
 						<ui5-timeline-item title-text="Online Meeting" subtitle-text="20.02.2017 11:30" icon="calendar">
@@ -356,6 +358,33 @@
 								<ui5-avatar initials="BR"></ui5-avatar>
 							</ui5-avatar-group>
 							<div>Review project deliverables</div>
+						</ui5-timeline-item>
+					</ui5-timeline-group-item>
+				</ui5-timeline>
+			</div>
+		</section>
+
+		<section style="width: 100%;">
+			<h2>Timeline with Various Timeline Item States</h2>
+			<div style="width: 50%; margin: 1rem;">
+				<ui5-timeline id="test-timeline">
+					<ui5-timeline-group-item group-name="Build">
+						<ui5-timeline-item title="Compile" subtitle="Testing suite A" icon="sap-icon://accept" icon-tooltip="Compilation successful" name="Testing suite A" state="Positive">
+							Compilation succeeded.
+						</ui5-timeline-item>
+						<ui5-timeline-item title="Lint" subtitle="Testing suite B" icon="sap-icon://message-information" name="Testing suite B" state="Information">
+							Lint completed with minor issues.
+						</ui5-timeline-item>
+					</ui5-timeline-group-item>
+					<ui5-timeline-group-item group-name="Test">
+						<ui5-timeline-item title="Unit Test" subtitle="Testing suite C" icon="sap-icon://decline" name="Testing suite C" state="Negative">
+							Unit tests failed.
+						</ui5-timeline-item>
+						<ui5-timeline-item title="Integration Test" subtitle="Testing suite D" icon="sap-icon://message-warning" name="Testing suite D" state="Critical">
+							Integration tests have warnings.
+						</ui5-timeline-item>
+						<ui5-timeline-item title="E2E Test" subtitle="Testing suite E" icon="sap-icon://accept" name="Testing suite E" state="Positive">
+							End-to-end tests passed.
 						</ui5-timeline-item>
 					</ui5-timeline-group-item>
 				</ui5-timeline>

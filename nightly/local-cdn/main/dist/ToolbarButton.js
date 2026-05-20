@@ -4,14 +4,13 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
-import ToolbarItem from "./ToolbarItem.js";
+import ToolbarItemBase from "./ToolbarItemBase.js";
 import ToolbarButtonTemplate from "./ToolbarButtonTemplate.js";
-import ToolbarPopoverButtonTemplate from "./ToolbarPopoverButtonTemplate.js";
-import ToolbarButtonPopoverCss from "./generated/themes/ToolbarButtonPopover.css.js";
-import { registerToolbarItem } from "./ToolbarRegistry.js";
+import ToolbarButtonCss from "./generated/themes/ToolbarButton.css.js";
 /**
  * @class
  *
@@ -23,13 +22,27 @@ import { registerToolbarItem } from "./ToolbarRegistry.js";
  * `import "@ui5/webcomponents/dist/ToolbarButton.js";`
  * @constructor
  * @abstract
- * @extends ToolbarItem
+ * @extends ToolbarItemBase
  * @public
  * @since 1.17.0
  */
-let ToolbarButton = class ToolbarButton extends ToolbarItem {
+let ToolbarButton = class ToolbarButton extends ToolbarItemBase {
     constructor() {
         super(...arguments);
+        /**
+        * Property used to define the access of the item to the overflow Popover. If "NeverOverflow" option is set,
+        * the item never goes in the Popover, if "AlwaysOverflow" - it never comes out of it.
+        * @public
+        * @default "Default"
+        */
+        this.overflowPriority = "Default";
+        /**
+         * Defines if the toolbar overflow popup should close upon interaction with the item.
+         * It will close by default.
+         * @default false
+         * @public
+         */
+        this.preventOverflowClosing = false;
         /**
          * Defines if the action is disabled.
          *
@@ -63,11 +76,18 @@ let ToolbarButton = class ToolbarButton extends ToolbarItem {
          */
         this.accessibilityAttributes = {};
         /**
-         * Defines if the toolbar button is hidden.
-         * @private
+         * Defines whether the button text should only be displayed in the overflow popover.
+         *
+         * When set to `true`, the button appears as icon-only in the main toolbar,
+         * but shows both icon and text when moved to the overflow popover.
+         *
+         * **Note:** This property only takes effect when the `text` property is also set.
+         *
          * @default false
+         * @public
+         * @since 2.17.0
          */
-        this.hidden = false;
+        this.showOverflowText = false;
     }
     get styles() {
         return {
@@ -75,14 +95,21 @@ let ToolbarButton = class ToolbarButton extends ToolbarItem {
             display: this.hidden ? "none" : "inline-block",
         };
     }
-    get containsText() {
-        return true;
-    }
-    static get toolbarTemplate() {
-        return ToolbarButtonTemplate;
-    }
-    static get toolbarPopoverTemplate() {
-        return ToolbarPopoverButtonTemplate;
+    /**
+     * Returns the effective text to display based on overflow state and showOverflowText property.
+     *
+     * When showOverflowText is true:
+     * - Normal state: returns empty string (icon-only)
+     * - Overflow state: returns text
+     *
+     * When showOverflowText is false:
+     * - Returns text in both states (normal behavior)
+     */
+    get effectiveText() {
+        if (this.showOverflowText) {
+            return this.isOverflowed ? this.text : "";
+        }
+        return this.text;
     }
     onClick(e) {
         e.stopImmediatePropagation();
@@ -91,7 +118,24 @@ let ToolbarButton = class ToolbarButton extends ToolbarItem {
             this.fireDecoratorEvent("close-overflow");
         }
     }
+    /**
+     * @override
+     */
+    get classes() {
+        return {
+            root: {
+                ...super.classes.root,
+                "ui5-tb-button": true,
+            },
+        };
+    }
 };
+__decorate([
+    property()
+], ToolbarButton.prototype, "overflowPriority", void 0);
+__decorate([
+    property({ type: Boolean })
+], ToolbarButton.prototype, "preventOverflowClosing", void 0);
 __decorate([
     property({ type: Boolean })
 ], ToolbarButton.prototype, "disabled", void 0);
@@ -120,15 +164,17 @@ __decorate([
     property()
 ], ToolbarButton.prototype, "text", void 0);
 __decorate([
+    property({ type: Boolean })
+], ToolbarButton.prototype, "showOverflowText", void 0);
+__decorate([
     property()
 ], ToolbarButton.prototype, "width", void 0);
-__decorate([
-    property({ type: Boolean })
-], ToolbarButton.prototype, "hidden", void 0);
 ToolbarButton = __decorate([
     customElement({
         tag: "ui5-toolbar-button",
-        styles: ToolbarButtonPopoverCss,
+        template: ToolbarButtonTemplate,
+        renderer: jsxRenderer,
+        styles: [ToolbarButtonCss],
     })
     /**
      * Fired when the component is activated either with a
@@ -144,7 +190,6 @@ ToolbarButton = __decorate([
         cancelable: true,
     })
 ], ToolbarButton);
-registerToolbarItem(ToolbarButton);
 ToolbarButton.define();
 export default ToolbarButton;
 //# sourceMappingURL=ToolbarButton.js.map

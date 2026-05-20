@@ -1,6 +1,8 @@
+import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { ClassMap } from "@ui5/webcomponents-base/dist/types.js";
 import MenuItem from "@ui5/webcomponents/dist/MenuItem.js";
 import type SideNavigationItemDesign from "./types/SideNavigationItemDesign.js";
+import type SideNavigationSelectableItemBase from "./SideNavigationSelectableItemBase.js";
 /**
  * @class
  *
@@ -52,14 +54,17 @@ declare class NavigationMenuItem extends MenuItem {
      */
     target?: string;
     design: `${SideNavigationItemDesign}`;
+    static i18nBundleFiori: I18nBundle;
+    associatedItem?: SideNavigationSelectableItemBase;
     get isExternalLink(): boolean | "" | undefined;
     get _href(): string | undefined;
     get _accInfo(): {
         role: import("@ui5/webcomponents-base/dist/types.js").AriaRole;
         ariaHaspopup?: `${import("@ui5/webcomponents-base/dist/types.js").AriaHasPopup}`;
         ariaKeyShortcuts?: string;
-        ariaHidden?: boolean;
         ariaExpanded?: boolean;
+        ariaHidden?: boolean;
+        ariaChecked?: boolean;
         ariaLevel?: number;
         ariaLabel: string;
         ariaLabelRadioButton: string;
@@ -67,12 +72,15 @@ declare class NavigationMenuItem extends MenuItem {
         posinset?: number;
         setsize?: number;
         ariaSelected?: boolean;
-        ariaChecked?: boolean;
         listItemAriaLabel?: string;
         ariaOwns?: string;
         tooltip?: string;
     };
     get classes(): ClassMap;
-    get acessibleNameText(): string;
+    _onclick(e: MouseEvent): void;
+    _activate(e: MouseEvent | KeyboardEvent): void;
+    _onkeydown(e: KeyboardEvent): Promise<void>;
+    _onkeyup(e: KeyboardEvent): void;
+    get accessibleNameText(): string;
 }
 export default NavigationMenuItem;

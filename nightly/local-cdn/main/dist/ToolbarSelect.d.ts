@@ -1,10 +1,10 @@
 import type ValueState from "@ui5/webcomponents-base/dist/types/ValueState.js";
-import ToolbarSelectTemplate from "./ToolbarSelectTemplate.js";
-import ToolbarPopoverSelectTemplate from "./ToolbarPopoverSelectTemplate.js";
-import ToolbarItem from "./ToolbarItem.js";
-import type { ToolbarItemEventDetail } from "./ToolbarItem.js";
+import type Select from "./Select.js";
+import ToolbarItemBase from "./ToolbarItemBase.js";
+import type { ToolbarItemEventDetail } from "./ToolbarItemBase.js";
 import type ToolbarSelectOption from "./ToolbarSelectOption.js";
 import type { SelectChangeEventDetail } from "./Select.js";
+import type { DefaultSlot, Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 type ToolbarSelectChangeEventDetail = ToolbarItemEventDetail & SelectChangeEventDetail;
 /**
  * @class
@@ -19,15 +19,16 @@ type ToolbarSelectChangeEventDetail = ToolbarItemEventDetail & SelectChangeEvent
  * `import "@ui5/webcomponents/dist/ToolbarSelectOption.js";` (comes with `ui5-toolbar-select`)
  * @constructor
  * @abstract
- * @extends ToolbarItem
+ * @extends ToolbarItemBase
  * @public
  * @since 1.17.0
  */
-declare class ToolbarSelect extends ToolbarItem {
-    eventDetails: ToolbarItem["eventDetails"] & {
+declare class ToolbarSelect extends ToolbarItemBase {
+    eventDetails: ToolbarItemBase["eventDetails"] & {
         change: ToolbarSelectChangeEventDetail;
         open: ToolbarItemEventDetail;
         close: ToolbarItemEventDetail;
+        "click": ToolbarItemEventDetail;
     };
     /**
      * Defines the width of the select.
@@ -46,7 +47,14 @@ declare class ToolbarSelect extends ToolbarItem {
      * **Note:** Use the `ui5-toolbar-select-option` component to define the desired options.
      * @public
      */
-    options: Array<ToolbarSelectOption>;
+    options: DefaultSlot<ToolbarSelectOption>;
+    /**
+     * Defines the HTML element that will be displayed in the component input part,
+     * representing the selected option.
+     * @public
+     * @since 2.15.0
+    */
+    label: Slot<HTMLElement>;
     /**
      * Defines the value state of the component.
      * @default "None"
@@ -73,8 +81,17 @@ declare class ToolbarSelect extends ToolbarItem {
      * @public
      */
     accessibleNameRef?: string;
-    static get toolbarTemplate(): typeof ToolbarSelectTemplate;
-    static get toolbarPopoverTemplate(): typeof ToolbarPopoverSelectTemplate;
+    /**
+     * Defines the value of the component:
+     *
+     * @public
+     * @default ""
+     * @since 2.15.0
+     */
+    set value(newValue: string);
+    get value(): string | undefined;
+    get select(): Select | null;
+    _value: string;
     onClick(e: Event): void;
     onOpen(e: Event): void;
     onClose(e: Event): void;
@@ -83,6 +100,7 @@ declare class ToolbarSelect extends ToolbarItem {
     get styles(): {
         width: string | undefined;
     };
+    get hasCustomLabel(): boolean;
 }
 export default ToolbarSelect;
 export type { ToolbarSelectChangeEventDetail, };

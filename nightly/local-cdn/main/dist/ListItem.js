@@ -9,13 +9,14 @@ import customElement from "@ui5/webcomponents-base/dist/decorators/customElement
 import { isSpace, isEnter, isDelete, isF2, } from "@ui5/webcomponents-base/dist/Keys.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import getActiveElement from "@ui5/webcomponents-base/dist/util/getActiveElement.js";
-import { getFirstFocusableElement } from "@ui5/webcomponents-base/dist/util/FocusableElements.js";
+import { getTabbableElements } from "@ui5/webcomponents-base/dist/util/TabbableElements.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
 import "@ui5/webcomponents-icons/dist/decline.js";
 import "@ui5/webcomponents-icons/dist/edit.js";
+import DragRegistry from "@ui5/webcomponents-base/dist/util/dragAndDrop/DragRegistry.js";
 import Highlight from "./types/Highlight.js";
 import ListItemType from "./types/ListItemType.js";
 import ListSelectionMode from "./types/ListSelectionMode.js";
@@ -84,15 +85,21 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
          * @since 1.24
          */
         this.highlight = "None";
-        /**
-         * Used to define the role of the list item.
-         * @private
-         * @default "ListItem"
-         * @since 1.3.0
-         *
-         */
-        this.accessibleRole = "ListItem";
         this._selectionMode = "None";
+        /**
+         * Indicates whether the list item is in edit mode.
+         * When active, Tab cycles through internal focusable elements
+         * instead of navigating to the next list item.
+         * Toggled by F2; also set by the parent List on F7.
+         * @private
+         */
+        this._editMode = false;
+        /**
+         * Defines the current media query size.
+         * @default "S"
+         * @private
+         */
+        this.mediaRange = "S";
         this.deactivateByKey = (e) => {
             if (isEnter(e)) {
                 this.deactivate();
@@ -119,8 +126,9 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
         document.removeEventListener("keyup", this.deactivateByKey);
         document.removeEventListener("touchend", this.deactivate);
     }
-    async _onkeydown(e) {
-        if ((isSpace(e) || isEnter(e)) && this._isTargetSelfFocusDomRef(e)) {
+    _onkeydown(e) {
+        const isInternalElementFocused = e.target !== this.getFocusDomRef();
+        if ((isSpace(e) || isEnter(e)) && isInternalElementFocused) {
             return;
         }
         super._onkeydown(e);
@@ -129,15 +137,7 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
             this.activate();
         }
         if (isF2(e)) {
-            const activeElement = getActiveElement();
-            const focusDomRef = this.getFocusDomRef();
-            if (activeElement === focusDomRef) {
-                const firstFocusable = await getFirstFocusableElement(focusDomRef);
-                firstFocusable?.focus();
-            }
-            else {
-                focusDomRef.focus();
-            }
+            this._handleF2();
         }
     }
     _onkeyup(e) {
@@ -168,6 +168,12 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
         }
     }
     _onfocusout(e) {
+        if (this._editMode) {
+            const relatedTarget = e.relatedTarget;
+            if (!relatedTarget || !(this.contains(relatedTarget) || this.shadowRoot.contains(relatedTarget))) {
+                this._editMode = false;
+            }
+        }
         if (e.target !== this.getFocusDomRef()) {
             return;
         }
@@ -178,6 +184,7 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
             return;
         }
         if (e.target === this._listItem) {
+            DragRegistry.setDraggedElement(this, e);
             this.setAttribute("data-moving", "");
             e.dataTransfer.dropEffect = "move";
             e.dataTransfer.effectAllowed = "move";
@@ -185,12 +192,9 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
     }
     _ondragend(e) {
         if (e.target === this._listItem) {
+            DragRegistry.clearDraggedElement();
             this.removeAttribute("data-moving");
         }
-    }
-    _isTargetSelfFocusDomRef(e) {
-        const target = e.target, focusDomRef = this.getFocusDomRef();
-        return target !== focusDomRef;
     }
     /**
      * Called when selection components in Single (ui5-radio-button)
@@ -268,7 +272,13 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
         return undefined;
     }
     get listItemAccessibleRole() {
-        return (this._forcedAccessibleRole || this.accessibleRole.toLowerCase());
+        if (this._forcedAccessibleRole) {
+            return this._forcedAccessibleRole;
+        }
+        if (this.accessibleRole) {
+            return this.accessibleRole.toLowerCase();
+        }
+        return (this._inheritedAccessibleRole || "listitem");
     }
     get ariaSelectedText() {
         let ariaSelectedText;
@@ -326,6 +336,83 @@ let ListItem = ListItem_1 = class ListItem extends ListItemBase {
     get _listItem() {
         return this.shadowRoot.querySelector("li");
     }
+    _handleF2() {
+        const focusDomRef = this.getFocusDomRef();
+        if (getActiveElement() === focusDomRef) {
+            const focusables = this._getFocusableElements();
+            if (!focusables.length) {
+                return;
+            }
+            this._editMode = true;
+            focusables[0].focus();
+        }
+        else {
+            this._editMode = false;
+            focusDomRef.focus();
+        }
+    }
+    _handleTabNext(e) {
+        if (this._editMode) {
+            const focusables = this._getFocusableElements();
+            const currentIndex = this._indexOfActiveElement(focusables);
+            const nextIndex = currentIndex + 1;
+            if (currentIndex !== -1 && nextIndex < focusables.length) {
+                e.preventDefault();
+                focusables[nextIndex].focus();
+            }
+            else if (!this.fireDecoratorEvent("forward-after")) {
+                e.preventDefault();
+            }
+            return;
+        }
+        if (!this.fireDecoratorEvent("forward-after")) {
+            e.preventDefault();
+        }
+    }
+    _handleTabPrevious(e) {
+        if (this._editMode) {
+            const focusables = this._getFocusableElements();
+            const currentIndex = this._indexOfActiveElement(focusables);
+            if (currentIndex > 0) {
+                e.preventDefault();
+                focusables[currentIndex - 1].focus();
+            }
+            else if (!this.fireDecoratorEvent("forward-before")) {
+                e.preventDefault();
+            }
+            return;
+        }
+        if (!this.fireDecoratorEvent("forward-before")) {
+            e.preventDefault();
+        }
+    }
+    _getFocusableElements() {
+        const focusDomRef = this.getFocusDomRef();
+        return getTabbableElements(focusDomRef);
+    }
+    _indexOfActiveElement(focusables) {
+        const activeElement = getActiveElement();
+        return focusables.findIndex(el => el === activeElement || (el.shadowRoot !== null && el.shadowRoot.contains(activeElement)));
+    }
+    _getFocusedElementIndex() {
+        return this._indexOfActiveElement(this._getFocusableElements());
+    }
+    _hasFocusableElements() {
+        return this._getFocusableElements().length > 0;
+    }
+    _isFocusOnInternalElement() {
+        return this._indexOfActiveElement(this._getFocusableElements()) !== -1;
+    }
+    _focusInternalElement(targetIndex) {
+        const focusables = this._getFocusableElements();
+        if (!focusables.length) {
+            return;
+        }
+        const safeIndex = Math.min(targetIndex, focusables.length - 1);
+        const elementToFocus = focusables[safeIndex];
+        elementToFocus.focus();
+        return safeIndex;
+    }
 };
 __decorate([
     property()
@@ -355,8 +442,14 @@ __decorate([
     property()
 ], ListItem.prototype, "_forcedAccessibleRole", void 0);
 __decorate([
+    property({ noAttribute: true })
+], ListItem.prototype, "_inheritedAccessibleRole", void 0);
+__decorate([
     property()
 ], ListItem.prototype, "_selectionMode", void 0);
+__decorate([
+    property()
+], ListItem.prototype, "mediaRange", void 0);
 __decorate([
     slot()
 ], ListItem.prototype, "deleteButton", void 0);

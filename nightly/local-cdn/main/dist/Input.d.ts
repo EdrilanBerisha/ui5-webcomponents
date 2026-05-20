@@ -1,4 +1,5 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot, Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type { UI5CustomEvent } from "@ui5/webcomponents-base";
 import type { AriaAutoComplete, AriaRole, AriaHasPopup, ClassMap } from "@ui5/webcomponents-base/dist/types.js";
 import type { ResizeObserverCallback } from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
@@ -11,9 +12,12 @@ import type InputSuggestions from "./features/InputSuggestions.js";
 import InputType from "./types/InputType.js";
 import type Popover from "./Popover.js";
 import type { IIcon } from "./Icon.js";
-import type PopoverHorizontalAlign from "./types/PopoverHorizontalAlign.js";
 import type { ListItemClickEventDetail, ListSelectionChangeEventDetail } from "./List.js";
+import type { ListItemBaseClickEventDetail } from "./ListItemBase.js";
 import type ResponsivePopover from "./ResponsivePopover.js";
+import type InputKeyHint from "./types/InputKeyHint.js";
+import type InputComposition from "./features/InputComposition.js";
+import InputSuggestionsFilter from "./types/InputSuggestionsFilter.js";
 /**
  * Interface for components that represent a suggestion item, usable in `ui5-input`
  * @public
@@ -22,6 +26,9 @@ interface IInputSuggestionItem extends UI5Element {
     focused: boolean;
     additionalText?: string;
     items?: IInputSuggestionItem[];
+    eventDetails: {
+        click?: ListItemBaseClickEventDetail;
+    };
 }
 interface IInputSuggestionItemSelectable extends IInputSuggestionItem {
     text?: string;
@@ -65,8 +72,8 @@ type InputSuggestionScrollEventDetail = {
  *
  * The `ui5-input` component allows the user to enter and edit text or numeric values in one line.
  *
- * Additionally, you can provide `suggestionItems`,
- * that are displayed in a popover right under the input.
+ * Additionally, you can provide `suggestionItems`
+ * that are displayed in a popover right under the input. Keep in mind that `ui5-input` with type `Number` does not support suggestions.
  *
  * The text field can be editable or read-only (`readonly` property),
  * and it can be enabled or disabled (`disabled` property).
@@ -85,6 +92,7 @@ type InputSuggestionScrollEventDetail = {
  * - [End] - If focus is in the text input, moves caret after the last character. If focus is in the list, highlights the last item and updates the input accordingly.
  * - [Page Up] - If focus is in the list, moves highlight up by page size (10 items by default). If focus is in the input, does nothing.
  * - [Page Down] - If focus is in the list, moves highlight down by page size (10 items by default). If focus is in the input, does nothing.
+ * - [Ctrl]+[Alt]+[F8] or [Command]+[Option]+[F8] - Focuses the first link in the value state message, if available. Pressing [Tab] moves the focus to the next link in the value state message, or closes the value state message if there are no more links.
  *
  * ### ES6 Module Import
  *
@@ -102,6 +110,7 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
         "change": InputEventDetail;
         "input": InputEventDetail;
         "select": void;
+        "_request-submit": void;
         "selection-change": InputSelectionChangeEventDetail;
         "type-ahead": void;
         "suggestion-scroll": InputSuggestionScrollEventDetail;
@@ -165,6 +174,7 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      * and the current language settings, especially for type `Number`.
      * - The property is mostly intended to be used with touch devices
      * that use different soft keyboard layouts depending on the given input type.
+     * - Type `Number` does not support suggestions.
      * @default "Text"
      * @public
      */
@@ -179,14 +189,6 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      * @public
      */
     value: string;
-    /**
-     * Defines the inner stored value of the component.
-     *
-     * **Note:** The property is updated upon typing. In some special cases the old value is kept (e.g. deleting the value after the dot in a float)
-     * @default ""
-     * @private
-     */
-    _innerValue: string;
     /**
      * Defines the value state of the component.
      * @default "None"
@@ -262,6 +264,13 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      */
     open: boolean;
     /**
+     * Defines the filter type of the component.
+     * @default "None"
+     * @public
+     * @since 2.19.0
+     */
+    filter: `${InputSuggestionsFilter}`;
+    /**
      * Defines whether the clear icon is visible.
      * @default false
      * @private
@@ -272,12 +281,14 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      * @private
      */
     focused: boolean;
-    valueStateOpen: boolean;
     /**
-     * Indicates whether the visual focus is on the value state header
+     * Used to define enterkeyhint of the inner input.
+     * https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/enterkeyhint
+     *
      * @private
      */
-    _isValueStateFocused: boolean;
+    hint?: `${InputKeyHint}`;
+    valueStateOpen: boolean;
     _inputAccInfo: InputAccInfo;
     _nativeInputAttributes: NativeInputAttributes;
     _inputWidth?: number;
@@ -303,6 +314,16 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      */
     Suggestions?: InputSuggestions;
     /**
+     * @private
+     */
+    _linksListenersArray: Array<(args: any) => void>;
+    /**
+     * Indicates whether IME composition is currently active
+     * @default false
+     * @private
+     */
+    _isComposing: boolean;
+    /**
      * Defines the suggestion items.
      *
      * **Note:** The suggestions would be displayed only if the `showSuggestions`
@@ -310,14 +331,16 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      *
      * **Note:** The `<ui5-suggestion-item>`, `<ui5-suggestion-item-group>` and `ui5-suggestion-item-custom` are recommended to be used as suggestion items.
      *
+     * **Note:** Input with type `Number` does not support suggestions.
+     *
      * @public
      */
-    suggestionItems: Array<IInputSuggestionItem>;
+    suggestionItems: DefaultSlot<IInputSuggestionItem>;
     /**
      * Defines the icon to be displayed in the component.
      * @public
      */
-    icon: Array<IIcon>;
+    icon: Slot<IIcon>;
     /**
      * Defines the value state message that will be displayed as pop up under the component.
      * The value state message slot should contain only one root element.
@@ -332,7 +355,7 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      * @since 1.0.0-rc.6
      * @public
      */
-    valueStateMessage: Array<HTMLElement>;
+    valueStateMessage: Slot<HTMLElement>;
     hasSuggestionItemSelected: boolean;
     valueBeforeItemSelection: string;
     valueBeforeSelectionStart: string;
@@ -342,7 +365,6 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     lastConfirmedValue: string;
     isTyping: boolean;
     _handleResizeBound: ResizeObserverCallback;
-    _keepInnerValue: boolean;
     _shouldAutocomplete?: boolean;
     _enterKeyDown?: boolean;
     _isKeyNavigation?: boolean;
@@ -351,11 +373,22 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     _clearIconClicked?: boolean;
     _focusedAfterClear: boolean;
     _changeToBeFired?: boolean;
+    _matchedSuggestionItem?: IInputSuggestionItemSelectable;
     _performTextSelection?: boolean;
     _isLatestValueFromSuggestions: boolean;
     _isChangeTriggeredBySuggestion: boolean;
+    _valueStateLinks: Array<HTMLElement>;
+    _composition?: InputComposition;
     static i18nBundle: I18nBundle;
-    get formValidityMessage(): string;
+    static composition: typeof InputComposition;
+    /**
+     * Indicates whether link navigation is being handled.
+     * @default false
+     * @private
+     * @since 2.11.0
+     */
+    _handleLinkNavigation: boolean;
+    get formValidityMessage(): string | undefined;
     get _effectiveShowSuggestions(): boolean;
     get formValidity(): ValidityStateFlags;
     formElementAnchor(): Promise<HTMLElement | undefined>;
@@ -367,6 +400,7 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     _isGroupItem(item: IInputSuggestionItem): boolean;
     onBeforeRendering(): void;
     onAfterRendering(): void;
+    _adjustSelectionRange(): void;
     _onkeydown(e: KeyboardEvent): void;
     _onkeyup(e: KeyboardEvent): void;
     get currentItemIndex(): number;
@@ -374,6 +408,9 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     _handleDown(e: KeyboardEvent): void;
     _handleSpace(e: KeyboardEvent): void;
     _handleTab(): void;
+    _handleCtrlAltF8(): void;
+    _addLinksEventListeners(): void;
+    _removeLinksEventListeners(): void;
     _handleEnter(e: KeyboardEvent): void;
     _handlePageUp(e: KeyboardEvent): void;
     _handlePageDown(e: KeyboardEvent): void;
@@ -401,10 +438,15 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     _getFirstMatchingItem(current: string): IInputSuggestionItemSelectable | undefined;
     _handleSelectionChange(e: CustomEvent<ListSelectionChangeEventDetail>): void;
     _selectMatchingItem(item: IInputSuggestionItemSelectable): void;
+    _filterItems(value: string): void;
+    _filterGroups(filterType: `${InputSuggestionsFilter}`, groupItems: IInputSuggestionItem[]): IInputSuggestionItem[];
+    _resetItemVisibility(): void;
     _handleTypeAhead(item: IInputSuggestionItemSelectable): void;
     _handleResize(): void;
     _updateAssociatedLabelsTexts(): void;
     _closePicker(): void;
+    _confirmMobileValue(): void;
+    _cancelMobileValue(): void;
     _afterOpenPicker(): void;
     _afterClosePicker(): void;
     _handlePickerAfterOpen(): void;
@@ -414,6 +456,12 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     _handleValueStatePopoverAfterClose(): void;
     _getValueStatePopover(): Popover;
     enableSuggestions(): void;
+    /**
+     * Enables IME composition handling.
+     * Dynamically loads the InputComposition feature and sets up event listeners.
+     * @private
+     */
+    _enableComposition(): void;
     acceptSuggestion(item: IInputSuggestionItemSelectable, keyboardUsed: boolean): void;
     /**
      * Updates the input value on item select.
@@ -459,6 +507,8 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     fireResetSelectionChange(): void;
     get _readonly(): boolean;
     get _headerTitleText(): string;
+    get _suggestionsOkButtonText(): string;
+    get _suggestionsCancelButtonText(): string;
     get clearIconAccessibleName(): string;
     get _popupLabel(): string;
     get inputType(): `${InputType}`;
@@ -491,15 +541,16 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
     };
     get ariaValueStateHiddenText(): string | undefined;
     get itemSelectionAnnounce(): string;
+    get linksInAriaValueStateHiddenText(): HTMLElement[];
+    get valueStateLinksShortcutsTextAcc(): string;
+    get _valueStateLinksShortcutsTextAccId(): "" | "hiddenText-value-state-link-shortcut";
     get iconsCount(): number;
     get classes(): ClassMap;
     get styles(): {
-        popoverHeader: {
-            "max-width": string;
-        };
         suggestionPopoverHeader: {
             display: string;
             width: string;
+            "max-width": string;
         };
         suggestionsPopover: {
             "min-width": string;
@@ -529,7 +580,6 @@ declare class Input extends UI5Element implements SuggestionComponent, IFormInpu
      * This method is relevant for sap_horizon theme only
      */
     get _valueStateInputIcon(): string;
-    get _valueStatePopoverHorizontalAlign(): `${PopoverHorizontalAlign}`;
     /**
      * This method is relevant for sap_horizon theme only
      */

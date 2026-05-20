@@ -1,4 +1,5 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { Slot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { IIcon } from "./Icon.js";
 import type { IToken } from "./MultiInput.js";
@@ -69,6 +70,12 @@ declare class Token extends UI5Element implements IToken {
      */
     toBeDeleted: boolean;
     /**
+     * Set by the tokenizer to mark the last visible token before overflow.
+     * @default false
+     * @private
+     */
+    lastVisibleToken: boolean;
+    /**
      * Defines the tabIndex of the component.
      * @private
      */
@@ -79,7 +86,7 @@ declare class Token extends UI5Element implements IToken {
      * @public
      * @since 1.0.0-rc.9
      */
-    closeIcon: Array<IIcon>;
+    closeIcon: Slot<IIcon>;
     static i18nBundle: I18nBundle;
     _handleSelect(): void;
     _focusin(): void;
@@ -87,7 +94,6 @@ declare class Token extends UI5Element implements IToken {
     _delete(): void;
     _onmousedown(e: MouseEvent): void;
     _keydown(e: KeyboardEvent): void;
-    onBeforeRendering(): void;
     get tokenDeletableText(): string;
     get textDom(): Element | null | undefined;
     get isTruncatable(): boolean;

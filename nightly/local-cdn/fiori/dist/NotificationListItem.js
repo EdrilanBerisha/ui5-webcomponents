@@ -9,7 +9,7 @@ import { isSpace, isDelete, isF10Shift, isEnterShift, } from "@ui5/webcomponents
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import query from "@ui5/webcomponents-base/dist/decorators/query.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import ResizeHandler from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
 import WrappingType from "@ui5/webcomponents/dist/types/WrappingType.js";
@@ -294,8 +294,9 @@ let NotificationListItem = NotificationListItem_1 = class NotificationListItem e
     /**
      * Event handlers
      */
-    _onclick() {
-        this.fireItemPress();
+    _onclick(e) {
+        e.stopPropagation();
+        this.fireItemPress(e);
     }
     _onShowMoreClick(e) {
         e.preventDefault();
@@ -317,6 +318,7 @@ let NotificationListItem = NotificationListItem_1 = class NotificationListItem e
         }
         if (isDelete(e)) {
             this.fireDecoratorEvent("close", { item: this });
+            this.fireDecoratorEvent("_close", { item: this });
         }
         if (isF10Shift(e)) {
             this._onBtnMenuClick();
@@ -327,6 +329,7 @@ let NotificationListItem = NotificationListItem_1 = class NotificationListItem e
     }
     _onBtnCloseClick() {
         this.fireDecoratorEvent("close", { item: this });
+        this.fireDecoratorEvent("_close", { item: this });
     }
     _onBtnMenuClick() {
         if (this.getMenu()) {
@@ -348,13 +351,14 @@ let NotificationListItem = NotificationListItem_1 = class NotificationListItem e
     /**
      * Private
      */
-    fireItemPress() {
+    fireItemPress(e) {
         if (this.getFocusDomRef().matches(":has(:focus-within)")) {
             return;
         }
         // NotificationListItem will never be assigned to a variable of type ListItemBase
         // typescipt complains here, if that is the case, the parameter to the _press event handler could be a ListItemBase item,
         // but this is never the case, all components are used by their class and never assigned to a variable with a type of ListItemBase
+        this.fireDecoratorEvent("click", { item: this, originalEvent: e });
         this.fireDecoratorEvent("_press", { item: this });
     }
     onResize() {
@@ -431,12 +435,31 @@ NotificationListItem = NotificationListItem_1 = __decorate([
         bubbles: true,
     })
     /**
+     * Fired when the component is activated either with a mouse/tap or by using the Enter or Space key.
+     *
+     * @since 2.22.0
+     * @public
+     * @param {NotificationListItem} item The activated item.
+     * @param {Event} originalEvent The original event from the user interaction.
+     */
+    ,
+    event("click", {
+        bubbles: true,
+    })
+    /**
      * Fired when the `Close` button is pressed.
      * @param {HTMLElement} item the closed item.
      * @public
      */
     ,
-    event("close", {
+    event("close")
+    /**
+     * Fired when the `Close` button is pressed.
+     * @param {HTMLElement} item the closed item.
+     * @private
+     */
+    ,
+    event("_close", {
         bubbles: true,
     })
 ], NotificationListItem);

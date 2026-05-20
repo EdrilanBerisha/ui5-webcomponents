@@ -7,9 +7,10 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import ResizeHandler from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
+import { getEffectiveAriaLabelText } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 // Template
 import BarTemplate from "./BarTemplate.js";
 // Styles
@@ -54,8 +55,15 @@ import BarCss from "./generated/themes/Bar.css.js";
 let Bar = class Bar extends UI5Element {
     get accInfo() {
         return {
-            "label": this.design,
+            "label": this.ariaLabelText,
+            "role": this.effectiveRole,
         };
+    }
+    get ariaLabelText() {
+        if (this.accessibleName || this.accessibleNameRef) {
+            return getEffectiveAriaLabelText(this);
+        }
+        return this.design;
     }
     constructor() {
         super();
@@ -65,6 +73,21 @@ let Bar = class Bar extends UI5Element {
          * @public
          */
         this.design = "Header";
+        /**
+         * Specifies the ARIA role applied to the component for accessibility purposes.
+         *
+         * **Note:**
+         *
+         * - Set accessibleRole to "toolbar" only when the component contains two or more active, interactive elements (such as buttons, links, or input fields) within the bar.
+         *
+         * - If there is only one or no active element, it is recommended to avoid using the "toolbar" role, as it implies a grouping of multiple interactive controls.
+         *
+         * @public
+         * @default "Toolbar"
+         * @since 2.10.0
+         *
+         */
+        this.accessibleRole = "Toolbar";
         this._handleResizeBound = this.handleResize.bind(this);
     }
     handleResize() {
@@ -87,18 +110,30 @@ let Bar = class Bar extends UI5Element {
             ResizeHandler.deregister(child, this._handleResizeBound);
         }, this);
     }
+    get effectiveRole() {
+        return this.accessibleRole.toLowerCase() === "toolbar" ? "toolbar" : undefined;
+    }
 };
 __decorate([
     property()
 ], Bar.prototype, "design", void 0);
 __decorate([
-    slot({ type: HTMLElement })
+    property()
+], Bar.prototype, "accessibleRole", void 0);
+__decorate([
+    property()
+], Bar.prototype, "accessibleName", void 0);
+__decorate([
+    property()
+], Bar.prototype, "accessibleNameRef", void 0);
+__decorate([
+    slot()
 ], Bar.prototype, "startContent", void 0);
 __decorate([
     slot({ type: HTMLElement, "default": true })
 ], Bar.prototype, "middleContent", void 0);
 __decorate([
-    slot({ type: HTMLElement })
+    slot()
 ], Bar.prototype, "endContent", void 0);
 Bar = __decorate([
     customElement({

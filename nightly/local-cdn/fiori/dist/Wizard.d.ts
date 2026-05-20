@@ -1,8 +1,11 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import ItemNavigation from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
+import type { UI5CustomEvent } from "@ui5/webcomponents-base";
 import type { ResizeObserverCallback } from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
 import type ResponsivePopover from "@ui5/webcomponents/dist/ResponsivePopover.js";
+import type Button from "@ui5/webcomponents/dist/Button.js";
 import type WizardContentLayout from "./types/WizardContentLayout.js";
 import "./WizardStep.js";
 import type WizardTab from "./WizardTab.js";
@@ -166,7 +169,7 @@ declare class Wizard extends UI5Element {
      * **Note:** Use the available `ui5-wizard-step` component.
      * @public
      */
-    steps: Array<WizardStep>;
+    steps: DefaultSlot<WizardStep>;
     static i18nBundle: I18nBundle;
     stepScrollOffsets: Array<number>;
     selectedStepIndex: number;
@@ -249,7 +252,7 @@ declare class Wizard extends UI5Element {
     _isGroupAtEnd(selectedStep: WizardTab): boolean;
     _showPopover(oDomTarget: WizardTab, isAtStart: boolean): void;
     _onGroupedTabClick(e: MouseEvent): void;
-    _onOverflowStepButtonClick(e: MouseEvent): void;
+    _onOverflowStepButtonClick(e: UI5CustomEvent<Button, "click">): void;
     _closeRespPopover(): void;
     _respPopover(): ResponsivePopover;
     /**
@@ -268,6 +271,7 @@ declare class Wizard extends UI5Element {
      */
     changeSelectionByStepAction(stepInHeader: WizardTab): Promise<void>;
     getContentHeight(): number;
+    getFocusDomRef(): HTMLElement | undefined;
     getStepAriaLabelText(step: WizardStep, ariaLabel: string): string;
     get stepsDOM(): HTMLElement[];
     get progressNavigatorListDOM(): Element;
@@ -293,6 +297,7 @@ declare class Wizard extends UI5Element {
     get activeStepText(): string;
     get inactiveStepText(): string;
     get ariaLabelText(): string;
+    get _dialogCancelButtonText(): string;
     get effectiveStepSwitchThreshold(): number;
     /**
      * Returns an array of data objects, based on the user defined steps
@@ -318,6 +323,12 @@ declare class Wizard extends UI5Element {
      * @private
      */
     scrollToSelectedStep(): void;
+    /**
+     * Focuses the first focusable element in the currently selected step.
+     * This helps screen readers announce the step change.
+     * @private
+     */
+    focusFirstElementInCurrentStep(): Promise<void>;
     /**
      * Scrolls to the content item within the `ui5-wizard` shadowDOM
      * by given step index.

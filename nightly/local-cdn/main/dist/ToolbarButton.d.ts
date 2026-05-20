@@ -1,8 +1,8 @@
 import type { ButtonAccessibilityAttributes } from "./Button.js";
 import type ButtonDesign from "./types/ButtonDesign.js";
-import ToolbarItem from "./ToolbarItem.js";
-import ToolbarButtonTemplate from "./ToolbarButtonTemplate.js";
-import ToolbarPopoverButtonTemplate from "./ToolbarPopoverButtonTemplate.js";
+import type ToolbarItemOverflowBehavior from "./types/ToolbarItemOverflowBehavior.js";
+import ToolbarItemBase from "./ToolbarItemBase.js";
+import type { ToolbarItemEventDetail } from "./ToolbarItemBase.js";
 type ToolbarButtonAccessibilityAttributes = ButtonAccessibilityAttributes;
 /**
  * @class
@@ -15,11 +15,28 @@ type ToolbarButtonAccessibilityAttributes = ButtonAccessibilityAttributes;
  * `import "@ui5/webcomponents/dist/ToolbarButton.js";`
  * @constructor
  * @abstract
- * @extends ToolbarItem
+ * @extends ToolbarItemBase
  * @public
  * @since 1.17.0
  */
-declare class ToolbarButton extends ToolbarItem {
+declare class ToolbarButton extends ToolbarItemBase {
+    eventDetails: ToolbarItemBase["eventDetails"] & {
+        click: ToolbarItemEventDetail;
+    };
+    /**
+    * Property used to define the access of the item to the overflow Popover. If "NeverOverflow" option is set,
+    * the item never goes in the Popover, if "AlwaysOverflow" - it never comes out of it.
+    * @public
+    * @default "Default"
+    */
+    overflowPriority: `${ToolbarItemOverflowBehavior}`;
+    /**
+     * Defines if the toolbar overflow popup should close upon interaction with the item.
+     * It will close by default.
+     * @default false
+     * @public
+     */
+    preventOverflowClosing: boolean;
     /**
      * Defines if the action is disabled.
      *
@@ -102,6 +119,19 @@ declare class ToolbarButton extends ToolbarItem {
      */
     text?: string;
     /**
+     * Defines whether the button text should only be displayed in the overflow popover.
+     *
+     * When set to `true`, the button appears as icon-only in the main toolbar,
+     * but shows both icon and text when moved to the overflow popover.
+     *
+     * **Note:** This property only takes effect when the `text` property is also set.
+     *
+     * @default false
+     * @public
+     * @since 2.17.0
+     */
+    showOverflowText: boolean;
+    /**
      * Defines the width of the button.
      *
      * **Note:** all CSS sizes are supported - 'percentage', 'px', 'rem', 'auto', etc.
@@ -109,20 +139,32 @@ declare class ToolbarButton extends ToolbarItem {
      * @public
      */
     width?: string;
-    /**
-     * Defines if the toolbar button is hidden.
-     * @private
-     * @default false
-     */
-    hidden: boolean;
     get styles(): {
         width: string | undefined;
         display: string;
     };
-    get containsText(): boolean;
-    static get toolbarTemplate(): typeof ToolbarButtonTemplate;
-    static get toolbarPopoverTemplate(): typeof ToolbarPopoverButtonTemplate;
+    /**
+     * Returns the effective text to display based on overflow state and showOverflowText property.
+     *
+     * When showOverflowText is true:
+     * - Normal state: returns empty string (icon-only)
+     * - Overflow state: returns text
+     *
+     * When showOverflowText is false:
+     * - Returns text in both states (normal behavior)
+     */
+    get effectiveText(): string | undefined;
     onClick(e: Event): void;
+    /**
+     * @override
+     */
+    get classes(): {
+        root: {
+            "ui5-tb-button": boolean;
+            "ui5-tb-popover-item": boolean;
+            "ui5-tb-item": boolean;
+        };
+    };
 }
 export default ToolbarButton;
 export type { ToolbarButtonAccessibilityAttributes, };

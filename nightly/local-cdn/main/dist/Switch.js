@@ -10,14 +10,14 @@ import customElement from "@ui5/webcomponents-base/dist/decorators/customElement
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import event from "@ui5/webcomponents-base/dist/decorators/event-strict.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
-import { isSpace, isEnter } from "@ui5/webcomponents-base/dist/Keys.js";
+import { isSpace, isEnter, isShift, isEscape, isSpaceShift, } from "@ui5/webcomponents-base/dist/Keys.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { getEffectiveAriaLabelText } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
+import { getEffectiveAriaLabelText, getAssociatedLabelForTexts } from "@ui5/webcomponents-base/dist/util/AccessibilityTextsHelper.js";
 import "@ui5/webcomponents-icons/dist/accept.js";
 import "@ui5/webcomponents-icons/dist/decline.js";
 import "@ui5/webcomponents-icons/dist/less.js";
 import SwitchDesign from "./types/SwitchDesign.js";
-import { FORM_CHECKABLE_REQUIRED } from "./generated/i18n/i18n-defaults.js";
+import { FORM_CHECKABLE_REQUIRED, SWITCH_ON, SWITCH_OFF, ACC_STATE_READONLY, } from "./generated/i18n/i18n-defaults.js";
 // Template
 import SwitchTemplate from "./SwitchTemplate.js";
 // Styles
@@ -63,10 +63,20 @@ let Switch = Switch_1 = class Switch extends UI5Element {
          */
         this.design = "Textual";
         /**
+         * Defines whether the component is in readonly state.
+         *
+         * **Note:** A readonly switch cannot be toggled by user interaction,
+         * but can still be focused and its value read programmatically.
+         * @default false
+         * @public
+         * @since 2.21.0
+         */
+        this.readonly = false;
+        /**
          * Defines if the component is checked.
          *
          * **Note:** The property can be changed with user interaction,
-         * either by cliking the component, or by pressing the `Enter` or `Space` key.
+         * either by clicking the component, or by pressing the `Enter` or `Space` key.
          * @default false
          * @formEvents change
          * @formProperty
@@ -88,6 +98,15 @@ let Switch = Switch_1 = class Switch extends UI5Element {
          * @since 1.16.0
          */
         this.required = false;
+        /**
+         * Defines the form value of the component.
+         * @default ""
+         * @since 2.12.0
+         * @public
+         */
+        this.value = "";
+        this._cancelAction = false;
+        this._isSpacePressed = false;
     }
     get formValidityMessage() {
         return Switch_1.i18nBundle.getText(FORM_CHECKABLE_REQUIRED);
@@ -99,29 +118,66 @@ let Switch = Switch_1 = class Switch extends UI5Element {
         return this.getFocusDomRefAsync();
     }
     get formFormattedValue() {
-        return this.checked ? "on" : null;
+        if (this.checked) {
+            return this.value || "on";
+        }
+        return null;
     }
     get sapNextIcon() {
         return this.checked ? "accept" : "less";
     }
+    _onfocusin() {
+        // Reset keyboard state on focus to prevent stale state from previous interactions
+        this._cancelAction = false;
+        this._isSpacePressed = false;
+    }
     _onclick() {
+        if (this.readonly) {
+            return;
+        }
         this.toggle();
     }
     _onkeydown(e) {
         if (isSpace(e)) {
             e.preventDefault();
         }
+        if (this.readonly) {
+            return;
+        }
+        if (isSpace(e)) {
+            this._isSpacePressed = true;
+        }
+        else if (isShift(e) || isEscape(e)) {
+            this._cancelAction = true;
+        }
         if (isEnter(e)) {
             this._onclick();
         }
     }
     _onkeyup(e) {
-        if (isSpace(e)) {
+        if (this.readonly) {
+            return;
+        }
+        const isSpaceKey = isSpace(e);
+        const isCancelKey = isShift(e) || isEscape(e);
+        if (isSpaceKey || isSpaceShift(e)) {
+            if (this._cancelAction) {
+                this._cancelAction = false;
+                this._isSpacePressed = false;
+                e.preventDefault();
+                return;
+            }
+            this._isSpacePressed = false;
+        }
+        else if (isCancelKey && !this._isSpacePressed) {
+            this._cancelAction = false;
+        }
+        if (isSpaceKey) {
             this._onclick();
         }
     }
     toggle() {
-        if (!this.disabled) {
+        if (!this.disabled && !this.readonly) {
             this.checked = !this.checked;
             const changePrevented = !this.fireDecoratorEvent("change");
             // Angular two way data binding;
@@ -143,28 +199,44 @@ let Switch = Switch_1 = class Switch extends UI5Element {
     get _textOff() {
         return this.graphical ? "" : this.textOff;
     }
+    /**
+     * Determines if custom on/off texts duplicate the default role announcement.
+     * When textOn/textOff match the localized "On"/"Off" strings (case-insensitive),
+     * they duplicate what role="switch" with aria-checked already announces,
+     * so they should be aria-hidden to avoid duplicate screen reader announcements.
+     */
+    get _textAriaHidden() {
+        const on = this.textOn?.toLowerCase();
+        const off = this.textOff?.toLowerCase();
+        const i18nOn = Switch_1.i18nBundle.getText(SWITCH_ON).toLowerCase();
+        const i18nOff = Switch_1.i18nBundle.getText(SWITCH_OFF).toLowerCase();
+        return (on === i18nOn && off === i18nOff) || undefined;
+    }
     get effectiveTabIndex() {
         return this.disabled ? undefined : 0;
+    }
+    get effectiveAriaReadonly() {
+        return this.readonly ? "true" : undefined;
     }
     get effectiveAriaDisabled() {
         return this.disabled ? "true" : undefined;
     }
-    get accessibilityOnText() {
-        return this._textOn;
-    }
-    get accessibilityOffText() {
-        return this._textOff;
-    }
-    get hiddenText() {
-        return this.checked ? this.accessibilityOnText : this.accessibilityOffText;
-    }
     get ariaLabelText() {
-        return [getEffectiveAriaLabelText(this), this.hiddenText].join(" ").trim();
+        return getEffectiveAriaLabelText(this) || getAssociatedLabelForTexts(this) || undefined;
+    }
+    get ariaDescribedBy() {
+        return this.readonly ? `${this._id}-readonly-desc` : undefined;
+    }
+    get ariaDescribedByText() {
+        return this.readonly ? Switch_1.i18nBundle.getText(ACC_STATE_READONLY) : "";
     }
 };
 __decorate([
     property()
 ], Switch.prototype, "design", void 0);
+__decorate([
+    property({ type: Boolean })
+], Switch.prototype, "readonly", void 0);
 __decorate([
     property({ type: Boolean })
 ], Switch.prototype, "checked", void 0);
@@ -192,6 +264,15 @@ __decorate([
 __decorate([
     property()
 ], Switch.prototype, "name", void 0);
+__decorate([
+    property()
+], Switch.prototype, "value", void 0);
+__decorate([
+    property({ type: Boolean, noAttribute: true })
+], Switch.prototype, "_cancelAction", void 0);
+__decorate([
+    property({ type: Boolean, noAttribute: true })
+], Switch.prototype, "_isSpacePressed", void 0);
 __decorate([
     i18n("@ui5/webcomponents")
 ], Switch, "i18nBundle", void 0);

@@ -1,5 +1,6 @@
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
-import type { AccessibilityAttributes } from "@ui5/webcomponents-base/dist/types.js";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
+import type { AccessibilityAttributes, AriaRole } from "@ui5/webcomponents-base/dist/types.js";
 import type I18nBundle from "@ui5/webcomponents-base/dist/i18nBundle.js";
 import type { ITabbable } from "@ui5/webcomponents-base/dist/delegate/ItemNavigation.js";
 import type { ResizeObserverCallback } from "@ui5/webcomponents-base/dist/delegate/ResizeHandler.js";
@@ -8,6 +9,7 @@ import type Icon from "./Icon.js";
 import AvatarSize from "./types/AvatarSize.js";
 import type AvatarShape from "./types/AvatarShape.js";
 import type AvatarColorScheme from "./types/AvatarColorScheme.js";
+import AvatarMode from "./types/AvatarMode.js";
 import "@ui5/webcomponents-icons/dist/employee.js";
 type AvatarAccessibilityAttributes = Pick<AccessibilityAttributes, "hasPopup">;
 /**
@@ -22,7 +24,7 @@ type AvatarAccessibilityAttributes = Pick<AccessibilityAttributes, "hasPopup">;
  *
  * ### Keyboard Handling
  *
- * - [Space] / [Enter] or [Return] - Fires the `click` event if the `interactive` property is set to true.
+ * - [Space] / [Enter] or [Return] - Fires the `click` event if the `mode` is set to `Interactive` or the deprecated `interactive` property is set to true.
  * - [Shift] - If [Space] is pressed, pressing [Shift] releases the component without triggering the click event.
  *
  * ### ES6 Module Import
@@ -48,12 +50,31 @@ declare class Avatar extends UI5Element implements ITabbable, IAvatarGroupItem {
     /**
      * Defines if the avatar is interactive (focusable and pressable).
      *
+     * **Note:** When set to `true`, this property takes precedence over the `mode` property,
+     * and the avatar will be rendered as interactive (role="button", focusable) regardless of the `mode` value.
+     *
      * **Note:** This property won't have effect if the `disabled`
      * property is set to `true`.
      * @default false
      * @public
+     * @deprecated Set `mode="Interactive"` instead for the same functionality with proper accessibility.
      */
     interactive: boolean;
+    /**
+     * Defines the mode of the component.
+     *
+     * **Note:**
+     * - `Image` (default) - renders with role="img"
+     * - `Decorative` - renders with role="presentation" and aria-hidden="true", making it purely decorative
+     * - `Interactive` - renders with role="button", focusable (tabindex="0"), and supports keyboard interaction
+     *
+     * **Note:** This property is ignored when the `interactive` property is set to `true`.
+     * In that case, the avatar will always be rendered as interactive.
+     * @default "Image"
+     * @public
+     * @since 2.20
+     */
+    mode: `${AvatarMode}`;
     /**
      * Defines the name of the UI5 Icon, that will be displayed.
      *
@@ -114,7 +135,9 @@ declare class Avatar extends UI5Element implements ITabbable, IAvatarGroupItem {
     size: `${AvatarSize}`;
     /**
      * Defines the background color of the desired image.
-     * @default "Accent6"
+     * If `colorScheme` is set to `Auto`, the avatar will be displayed with the `Accent6` color.
+     *
+     * @default "Auto"
      * @public
      */
     colorScheme: `${AvatarColorScheme}`;
@@ -143,7 +166,14 @@ declare class Avatar extends UI5Element implements ITabbable, IAvatarGroupItem {
      */
     accessibilityAttributes: AvatarAccessibilityAttributes;
     forcedTabIndex?: string;
+    /**
+     * @private
+     */
     _hasImage: boolean;
+    /**
+     * @private
+     */
+    _imageLoadError: boolean;
     /**
      * Receives the desired `<img>` tag
      *
@@ -154,20 +184,26 @@ declare class Avatar extends UI5Element implements ITabbable, IAvatarGroupItem {
      * @public
      * @since 1.0.0-rc.15
      */
-    image: Array<HTMLElement>;
+    image: DefaultSlot<HTMLElement>;
     /**
      * Defines the optional badge that will be used for visual affordance.
      *
+     * **Recommendation:** While badges are supported on all avatars, it is recommended
+     * to use them with interactive avatars (via `mode="Interactive"` or `interactive` attribute)
+     * to provide better user experience and accessibility.
+     *
      * **Note:** While the slot allows for custom badges, to achieve
-     * the Fiori design, you can use the `ui5-tag` with `ui5-icon`
-     * in the corresponding `icon` slot, without text nodes.
+     * the Fiori design, use the `ui5-avatar-badge` component.
      * @public
      * @since 1.7.0
      */
-    badge: Array<HTMLElement>;
+    badge: Slot<HTMLElement>;
     static i18nBundle: I18nBundle;
     _handleResizeBound: ResizeObserverCallback;
+    _onImageLoadBound: (e: Event) => void;
+    _onImageErrorBound: (e: Event) => void;
     constructor();
+    onBeforeRendering(): void;
     get tabindex(): number | undefined;
     /**
      * Returns the effective avatar size.
@@ -177,16 +213,18 @@ declare class Avatar extends UI5Element implements ITabbable, IAvatarGroupItem {
     get effectiveSize(): AvatarSize;
     /**
      * Returns the effective background color.
-     * @default "Accent6"
+     * @default "Auto"
      * @private
      */
-    get еffectiveBackgroundColor(): AvatarColorScheme;
-    get _role(): "button" | "img";
+    get effectiveBackgroundColor(): AvatarColorScheme;
+    get _role(): "button" | "presentation" | "img";
+    get effectiveAriaHidden(): "true" | undefined;
     get _ariaHasPopup(): import("@ui5/webcomponents-base/dist/types.js").AriaHasPopup | undefined;
     get _interactive(): boolean;
     get validInitials(): string | null | undefined;
     get accessibleNameText(): string;
     get hasImage(): boolean;
+    get imageEl(): HTMLImageElement | null;
     get initialsContainer(): HTMLObjectElement | null;
     get fallBackIconDomRef(): Icon | null;
     onAfterRendering(): Promise<void>;
@@ -201,6 +239,22 @@ declare class Avatar extends UI5Element implements ITabbable, IAvatarGroupItem {
     _onkeyup(e: KeyboardEvent): void;
     _fireClick(): void;
     _getAriaHasPopup(): import("@ui5/webcomponents-base/dist/types.js").AriaHasPopup | undefined;
+    _attachImageEventHandlers(): void;
+    _checkExistingImageState(): void;
+    _detachImageEventHandlers(): void;
+    _onImageLoad(e: Event): void;
+    _onImageError(e: Event): void;
+    get accessibilityInfo(): {
+        role?: undefined;
+        type?: undefined;
+        description?: undefined;
+        disabled?: undefined;
+    } | {
+        role: AriaRole;
+        type: string;
+        description: string;
+        disabled: boolean;
+    };
 }
 export default Avatar;
 export type { AvatarAccessibilityAttributes, };

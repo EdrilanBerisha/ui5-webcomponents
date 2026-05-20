@@ -39,7 +39,9 @@ declare const testAssets: {
     getLocaleData: (lang: string) => Promise<import("@ui5/webcomponents-localization/dist/LocaleData.js").default>;
     applyDirection: () => Promise<void>;
     attachDirectionChange: (listener: () => void) => void;
-    ResizeHandler: typeof import("@ui5/webcomponents-base/dist/delegate/ResizeHandler.js").default;
+    attachLanguageChange: (listener: (lang: string) => Promise<void | Array<void>>) => void;
+    detachLanguageChange: (listener: (lang: string) => Promise<void | Array<void>>) => void;
+    ResizeHandler: typeof import("@ui5/webcomponents-base/dist/index.js").ResizeHandler;
     addCustomCSS: (tag: string, css: string) => Promise<void>;
     attachThemeLoaded: (listener: (theme: string) => void) => void;
     detachThemeLoaded: (listener: (theme: string) => void) => void;
@@ -50,5 +52,6 @@ declare const testAssets: {
     getEffectiveIconCollection: (collectionName?: import("@ui5/webcomponents-base/dist/config/Icons.js").IconCollection) => import("@ui5/webcomponents-base/dist/config/Icons.js").IconCollection;
     ignoreCustomElements: (tagPrefix: string) => void;
     shouldIgnoreCustomElement: (tag: string) => boolean;
+    startMultipleDrag: (count: number, e: DragEvent) => Promise<void>;
 };
 export default testAssets;

@@ -8,7 +8,7 @@ import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
 import property from "@ui5/webcomponents-base/dist/decorators/property.js";
 import customElement from "@ui5/webcomponents-base/dist/decorators/customElement.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
-import slot from "@ui5/webcomponents-base/dist/decorators/slot.js";
+import slot from "@ui5/webcomponents-base/dist/decorators/slot-strict.js";
 // Template
 import FormItemTemplate from "./FormItemTemplate.js";
 // Styles
@@ -46,6 +46,10 @@ let FormItem = class FormItem extends UI5Element {
          * @private
          */
         this.itemSpacing = "Normal";
+        /**
+         * @private
+         */
+        this.accessibleMode = "Display";
     }
     get isGroup() {
         return false;
@@ -67,6 +71,9 @@ __decorate([
 __decorate([
     property()
 ], FormItem.prototype, "itemSpacing", void 0);
+__decorate([
+    property()
+], FormItem.prototype, "accessibleMode", void 0);
 FormItem = __decorate([
     customElement({
         tag: "ui5-form-item",

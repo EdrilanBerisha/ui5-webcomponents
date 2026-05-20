@@ -9,7 +9,6 @@ import type SuggestionItem from "../SuggestionItem.js";
 import InputSuggestionsTemplate from "./InputSuggestionsTemplate.js";
 import type { IInputSuggestionItem, IInputSuggestionItemSelectable } from "../Input.js";
 interface SuggestionComponent extends UI5Element {
-    _isValueStateFocused: boolean;
     focused: boolean;
     hasSuggestionItemSelected: boolean;
     value: string;
@@ -73,6 +72,7 @@ declare class Suggestions {
     _handleItemNavigation(forward: boolean, index: number): void;
     _selectNextItem(): void;
     _selectPreviousItem(): void;
+    get visibleItems(): IInputSuggestionItem[];
     _moveItemSelection(previousIdx: number, nextIdx: number): void;
     _deselectItems(): void;
     _clearItemFocus(): void;
@@ -92,8 +92,6 @@ declare class Suggestions {
     get itemSelectionAnnounce(): string;
     hightlightInput(text: string, input: string): string;
     get _hasValueState(): boolean;
-    _focusValueState(): void;
-    _clearValueStateFocus(): void;
     _clearSelectedSuggestionAndaccInfo(): void;
 }
 export default Suggestions;

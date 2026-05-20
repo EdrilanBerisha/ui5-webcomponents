@@ -6,16 +6,18 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 var UserMenu_1;
 import UI5Element from "@ui5/webcomponents-base/dist/UI5Element.js";
-import { customElement, slot, eventStrict as event, property, } from "@ui5/webcomponents-base/dist/decorators.js";
+import { customElement, slotStrict as slot, eventStrict as event, property, } from "@ui5/webcomponents-base/dist/decorators.js";
 import jsxRenderer from "@ui5/webcomponents-base/dist/renderer/JsxRenderer.js";
 import query from "@ui5/webcomponents-base/dist/decorators/query.js";
 import DOMReferenceConverter from "@ui5/webcomponents-base/dist/converters/DOMReference.js";
 import i18n from "@ui5/webcomponents-base/dist/decorators/i18n.js";
-import { isPhone } from "@ui5/webcomponents-base/dist/Device.js";
+import { isInstanceOfMenuItem } from "@ui5/webcomponents/dist/MenuItem.js";
+import { isPhone, isDesktop } from "@ui5/webcomponents-base/dist/Device.js";
 import UserMenuTemplate from "./UserMenuTemplate.js";
 import UserMenuCss from "./generated/themes/UserMenu.css.js";
 // Texts
 import { USER_MENU_OTHER_ACCOUNT_BUTTON_TXT, USER_MENU_MANAGE_ACCOUNT_BUTTON_TXT, USER_MENU_SIGN_OUT_BUTTON_TXT, USER_MENU_POPOVER_ACCESSIBLE_NAME, USER_MENU_EDIT_AVATAR_TXT, USER_MENU_EDIT_ACCOUNTS_TXT, USER_MENU_CLOSE_DIALOG_BUTTON, USER_MENU_POPOVER_ACCESSIBLE_ACCOUNT_SELECTED_TXT, USER_MENU_CURRENT_INFORMATION_TXT, USER_MENU_ACTIONS_TXT, } from "./generated/i18n/i18n-defaults.js";
+const MENU_OPEN_DELAY = 300;
 /**
  * @class
  * ### Overview
@@ -30,7 +32,6 @@ import { USER_MENU_OTHER_ACCOUNT_BUTTON_TXT, USER_MENU_MANAGE_ACCOUNT_BUTTON_TXT
  *
  * @constructor
  * @extends UI5Element
- * @experimental
  * @public
  * @since 2.5.0
  */
@@ -86,20 +87,27 @@ let UserMenu = UserMenu_1 = class UserMenu extends UI5Element {
     }
     onBeforeRendering() {
         this._selectedAccount = this.accounts.find(account => account.selected) || this.accounts[0];
+        const siblingsWithIcon = this._menuItems.some(menuItem => !!menuItem.icon);
+        this._menuItems.forEach(item => {
+            item._siblingsWithIcon = siblingsWithIcon;
+        });
     }
     onAfterRendering() {
-        if (this._responsivePopover) {
-            const observerOptions = {
-                threshold: [0.15],
-            };
-            this._observer?.disconnect();
-            this._observer = new IntersectionObserver(entries => this._handleIntersection(entries), observerOptions);
-            if (this._selectedAccountTitleEl) {
-                this._observer.observe(this._selectedAccountTitleEl);
-            }
-            if (this._selectedAccountManageBtn) {
-                this._observer.observe(this._selectedAccountManageBtn);
-            }
+        if (this._responsivePopover && this.open && !this._observer) {
+            this._setupObserver();
+        }
+    }
+    _setupObserver() {
+        const observerOptions = {
+            threshold: [0.15],
+        };
+        this._observer?.disconnect();
+        this._observer = new IntersectionObserver(entries => this._handleIntersection(entries), observerOptions);
+        if (this._selectedAccountTitleEl) {
+            this._observer.observe(this._selectedAccountTitleEl);
+        }
+        if (this._selectedAccountManageBtn) {
+            this._observer.observe(this._selectedAccountManageBtn);
         }
     }
     get _isPhone() {
@@ -153,7 +161,8 @@ let UserMenu = UserMenu_1 = class UserMenu extends UI5Element {
         this._closeUserMenu();
     }
     _handleMenuItemClick(e) {
-        const item = e.detail.item; // imrove: improve this ideally without "as" cating
+        const item = e.detail.item;
+        item._updateCheckedState();
         if (!item._popover) {
             const eventPrevented = !this.fireDecoratorEvent("item-click", {
                 "item": item,
@@ -163,6 +172,7 @@ let UserMenu = UserMenu_1 = class UserMenu extends UI5Element {
             }
         }
         else {
+            this._closeOtherSubMenus(item);
             this._openItemSubMenu(item);
         }
     }
@@ -170,19 +180,56 @@ let UserMenu = UserMenu_1 = class UserMenu extends UI5Element {
         this._closeUserMenu();
     }
     _handlePopoverAfterOpen() {
+        this._titleMovedToHeader = false;
+        this._isScrolled = false;
+        this._setupObserver();
         this.fireDecoratorEvent("open");
     }
     _handlePopoverAfterClose() {
+        this._observer?.disconnect();
+        this._observer = undefined;
+        this._titleMovedToHeader = false;
+        this._isScrolled = false;
         this.open = false;
         this.fireDecoratorEvent("close");
     }
-    _openItemSubMenu(item) {
+    _itemMouseOver(e) {
+        if (!isDesktop()) {
+            return;
+        }
+        const item = e.target;
+        if (!isInstanceOfMenuItem(item)) {
+            return;
+        }
+        item.getFocusDomRef()?.focus();
+        this._startOpenTimeout(item);
+    }
+    _startOpenTimeout(item) {
+        clearTimeout(this._timeout);
+        this._timeout = setTimeout(() => {
+            this._closeOtherSubMenus(item);
+            this._openItemSubMenu(item, true);
+        }, MENU_OPEN_DELAY);
+    }
+    _closeOtherSubMenus(item) {
+        if (!this._menuItems.includes(item)) {
+            return;
+        }
+        this._menuItems.forEach(menuItem => {
+            if (menuItem !== item) {
+                menuItem._close();
+            }
+        });
+    }
+    _openItemSubMenu(item, openedByMouse = false) {
+        clearTimeout(this._timeout);
         if (!item._popover || item._popover.open) {
             return;
         }
         item._popover.opener = item;
         item._popover.open = true;
         item.selected = true;
+        item._openedByMouse = openedByMouse;
     }
     _closeUserMenu() {
         this.open = false;
@@ -220,8 +267,14 @@ let UserMenu = UserMenu_1 = class UserMenu extends UI5Element {
     get _ariaLabelledByActions() {
         return UserMenu_1.i18nBundle.getText(USER_MENU_ACTIONS_TXT);
     }
+    get _hasCustomFooter() {
+        return this.footer.length > 0 && this.footer[0]?.innerHTML.trim() !== "";
+    }
+    get _showDefaultFooter() {
+        return this.footer.length === 0;
+    }
     getAccountDescriptionText(account) {
-        return `${account.subtitleText} ${account.description} ${account.selected ? UserMenu_1.i18nBundle.getText(USER_MENU_POPOVER_ACCESSIBLE_ACCOUNT_SELECTED_TXT) : ""}`;
+        return `${account.titleText} ${account.subtitleText} ${account.description} ${account.selected ? UserMenu_1.i18nBundle.getText(USER_MENU_POPOVER_ACCESSIBLE_ACCOUNT_SELECTED_TXT) : ""}`;
     }
     getAccountByRefId(refId) {
         return this.accounts.find(account => account._id === refId);
@@ -230,6 +283,9 @@ let UserMenu = UserMenu_1 = class UserMenu extends UI5Element {
         if (ref) {
             ref.associatedAccount = this;
         }
+    }
+    get _menuItems() {
+        return this.menuItems.filter(isInstanceOfMenuItem);
     }
 };
 __decorate([
@@ -265,6 +321,9 @@ __decorate([
         },
     })
 ], UserMenu.prototype, "accounts", void 0);
+__decorate([
+    slot()
+], UserMenu.prototype, "footer", void 0);
 __decorate([
     property({ type: Boolean })
 ], UserMenu.prototype, "_titleMovedToHeader", void 0);

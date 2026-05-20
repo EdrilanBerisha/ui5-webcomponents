@@ -1,5 +1,6 @@
 import TableRowBase from "./TableRowBase.js";
 import type TableHeaderCell from "./TableHeaderCell.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 /**
  * @class
  *
@@ -18,9 +19,8 @@ import type TableHeaderCell from "./TableHeaderCell.js";
  * @extends TableRowBase
  * @since 2.0.0
  * @public
- * @experimental This web component is available since 2.0 with an experimental flag and its API and behavior are subject to change.
  */
-declare class TableHeaderRow extends TableRowBase {
+declare class TableHeaderRow extends TableRowBase<TableHeaderCell> {
     /**
      * Defines the cells of the component.
      *
@@ -28,7 +28,7 @@ declare class TableHeaderRow extends TableRowBase {
      *
      * @public
      */
-    cells: Array<TableHeaderCell>;
+    cells: DefaultSlot<TableHeaderCell>;
     /**
      * Sticks the `ui5-table-header-row` to the top of a table.
      *
@@ -42,8 +42,13 @@ declare class TableHeaderRow extends TableRowBase {
     onBeforeRendering(): void;
     isHeaderRow(): boolean;
     get _isSelectable(): boolean;
+    get _hasSelectedRows(): boolean;
+    get _shouldRenderClearAll(): boolean;
+    get _selectionCellAriaDescription(): string | undefined;
     get _i18nSelection(): string;
     get _i18nRowPopin(): string;
     get _i18nRowActions(): string;
+    get _i18nSelectAllRows(): string;
+    get _i18nDeselectAllRows(): string;
 }
 export default TableHeaderRow;

@@ -18,13 +18,20 @@ let UserMenuAccount =
  *
  * @constructor
  * @extends UI5Element
- * @experimental
  * @public
  * @since 2.5.0
  */
 class UserMenuAccount extends UI5Element {
     constructor() {
         super(...arguments);
+        /**
+         * Defines the background color of the desired image.
+         * If `avatarColorScheme` is set to `Auto`, the avatar will be displayed with the `Accent6` color.
+         *
+         * @default "Auto"
+         * @public
+         */
+        this.avatarColorScheme = "Auto";
         /**
          * Defines the title text of the user.
          *
@@ -47,6 +54,13 @@ class UserMenuAccount extends UI5Element {
          */
         this.description = "";
         /**
+         * Defines additional information for the user.
+         *
+         * @default ""
+         * @public
+         */
+        this.additionalInfo = "";
+        /**
          * Defines if the user is selected.
          *
          * @default false
@@ -62,7 +76,7 @@ class UserMenuAccount extends UI5Element {
         this.loading = false;
     }
     get _initials() {
-        return this.avatarInitials || "undefined";
+        return this.avatarInitials || undefined;
     }
 };
 __decorate([
@@ -72,6 +86,9 @@ __decorate([
     property({ type: String })
 ], UserMenuAccount.prototype, "avatarInitials", void 0);
 __decorate([
+    property()
+], UserMenuAccount.prototype, "avatarColorScheme", void 0);
+__decorate([
     property({ type: String })
 ], UserMenuAccount.prototype, "titleText", void 0);
 __decorate([
@@ -80,6 +97,9 @@ __decorate([
 __decorate([
     property({ type: String })
 ], UserMenuAccount.prototype, "description", void 0);
+__decorate([
+    property({ type: String })
+], UserMenuAccount.prototype, "additionalInfo", void 0);
 __decorate([
     property({ type: Boolean })
 ], UserMenuAccount.prototype, "selected", void 0);
@@ -101,7 +121,6 @@ UserMenuAccount = __decorate([
      *
      * @constructor
      * @extends UI5Element
-     * @experimental
      * @public
      * @since 2.5.0
      */

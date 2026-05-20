@@ -1,4 +1,5 @@
 import MenuItem from "@ui5/webcomponents/dist/MenuItem.js";
+import type { DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 /**
  * @class
  *
@@ -18,7 +19,6 @@ import MenuItem from "@ui5/webcomponents/dist/MenuItem.js";
  * `import "@ui5/webcomponents-fiori/dist/UserMenuItem.js";`
  * @constructor
  * @extends MenuItem
- * @experimental
  * @public
  * @since 2.5.0
  */
@@ -29,7 +29,31 @@ declare class UserMenuItem extends MenuItem {
      * **Note:** Use `ui5-user-menu-item` for the intended design.
      * @public
      */
-    items: Array<UserMenuItem>;
+    items: DefaultSlot<UserMenuItem>;
+    /**
+     * When set, a second line appears below the menu item text showing the text
+     * of the currently selected sub-item. Intended for use with a single-select
+     * ui5-menu-item-group (check-mode="Single").
+     * When enabled, the checked sub-item cannot be unchecked,
+     * ensuring the selection text is always displayed.
+     *
+     * @default false
+     * @public
+     * @since 2.22.0
+     */
+    showSelection: boolean;
     get _menuItems(): UserMenuItem[];
+    /**
+     * Overrides the base MenuItem behavior to prevent unchecking
+     * the currently checked item in single-select mode when
+     * the parent item uses showSelection, ensuring there is always
+     * a visible selection.
+     */
+    _updateCheckedState(): void;
+    /**
+     * Returns the text of the currently checked sub-item.
+     * Only returns text for single-select groups.
+     */
+    get _selectedSubItemText(): string;
 }
 export default UserMenuItem;

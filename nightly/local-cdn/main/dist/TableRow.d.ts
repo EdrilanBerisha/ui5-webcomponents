@@ -1,7 +1,9 @@
 import TableRowBase from "./TableRowBase.js";
 import type TableCell from "./TableCell.js";
 import type TableRowActionBase from "./TableRowActionBase.js";
-import "@ui5/webcomponents-icons/dist/overflow.js";
+import type Button from "./Button.js";
+import type { UI5CustomEvent } from "@ui5/webcomponents-base";
+import type { Slot, DefaultSlot } from "@ui5/webcomponents-base/dist/UI5Element.js";
 /**
  * @class
  *
@@ -17,9 +19,8 @@ import "@ui5/webcomponents-icons/dist/overflow.js";
  * @extends TableRowBase
  * @since 2.0.0
  * @public
- * @experimental This web component is available since 2.0 with an experimental flag and its API and behavior are subject to change.
  */
-declare class TableRow extends TableRowBase {
+declare class TableRow extends TableRowBase<TableCell> {
     /**
      * Defines the cells of the component.
      *
@@ -27,7 +28,7 @@ declare class TableRow extends TableRowBase {
      *
      * @public
      */
-    cells: Array<TableCell>;
+    cells: DefaultSlot<TableCell>;
     /**
      * Defines the actions of the component.
      *
@@ -36,7 +37,7 @@ declare class TableRow extends TableRowBase {
      * @since 2.7.0
      * @public
      */
-    actions: Array<TableRowActionBase>;
+    actions: Slot<TableRowActionBase>;
     /**
      * Unique identifier of the row.
      *
@@ -47,7 +48,7 @@ declare class TableRow extends TableRowBase {
      */
     rowKey?: string;
     /**
-     * Defines the position of the row related to the total number of rows within the table when the `ui5-table-virtualizer` feature is used.
+     * Defines the 0-based position of the row related to the total number of rows within the table when the `ui5-table-virtualizer` feature is used.
      *
      * @default undefined
      * @since 2.5.0
@@ -76,17 +77,22 @@ declare class TableRow extends TableRowBase {
      * @public
      */
     movable: boolean;
+    _popinCell?: TableCell;
+    _actionsCell?: TableCell;
     onBeforeRendering(): void;
-    focus(focusOptions?: FocusOptions | undefined): Promise<void>;
+    _onpointerdown(e: PointerEvent): Promise<void>;
     _onkeydown(e: KeyboardEvent, eventOrigin: HTMLElement): void;
     _onclick(): void;
-    _onkeyup(): void;
-    _onfocusout(): void;
-    _onOverflowButtonClick(e: MouseEvent): void;
+    _setActive(deactivationEvent: string): void;
+    _onOverflowButtonClick(e: UI5CustomEvent<Button, "click">): void;
     get _isInteractive(): boolean;
+    get _isNavigable(): boolean;
+    get _rowIndex(): number;
     get _hasOverflowActions(): boolean;
     get _flexibleActions(): TableRowActionBase[];
     get _fixedActions(): TableRowActionBase[];
     get _overflowActions(): TableRowActionBase[];
+    get _availableActionsCount(): number;
+    get _actionCellAccText(): string | undefined;
 }
 export default TableRow;
