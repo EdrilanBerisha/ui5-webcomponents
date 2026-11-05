@@ -29923,12 +29923,6 @@
     },
     {
       "kind": "javascript-module",
-      "path": "dist/timepicker-utils/TimeSlider.js",
-      "declarations": [],
-      "exports": []
-    },
-    {
-      "kind": "javascript-module",
       "path": "dist/popup-utils/OpenedPopupsRegistry.js",
       "declarations": [],
       "exports": []
@@ -29936,6 +29930,12 @@
     {
       "kind": "javascript-module",
       "path": "dist/popup-utils/PopoverRegistry.js",
+      "declarations": [],
+      "exports": []
+    },
+    {
+      "kind": "javascript-module",
+      "path": "dist/timepicker-utils/TimeSlider.js",
       "declarations": [],
       "exports": []
     },
