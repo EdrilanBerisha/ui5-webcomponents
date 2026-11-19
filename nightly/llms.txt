@@ -834,4 +834,4 @@ import "@ui5/webcomponents-icons/dist/add.js";
 
 ---
 
-Generated: 2026-11-18T05:38:00.533Z
+Generated: 2026-11-19T05:36:28.184Z
